@@ -12,6 +12,7 @@ const links = [
   { href: "/cases", label: "客户案例" },
   { href: "/about", label: "关于我们" },
   { href: "/explore", label: "智能获客" },
+  { href: "/dashboard", label: "数据看板" },
 ];
 
 export default function Navbar({ site }: { site: SiteInfo }) {
