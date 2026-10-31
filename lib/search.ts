@@ -124,7 +124,10 @@ async function tavilySearch(
     },
     8000
   );
-  if (!res.ok) throw new Error(`Tavily ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Tavily ${res.status} ${detail.slice(0, 200)}`);
+  }
   const data = await res.json();
   const results: SearchResult[] = (data.results || []).map((it: any) => ({
     title: it.title,

@@ -94,10 +94,16 @@ export default function ExploreClient() {
             {data.provider === "mock" && (
               <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
                 <p className="font-medium">当前为演示示例数据，条目链接不可访问</p>
-                <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
-                  网站尚未配置真实检索密钥（Bing 检索服务已于 2025 年 8 月停止服务）。
-                  在部署平台配置 TAVILY_API_KEY 或 BRAVE_API_KEY 后，这里将返回真实全网结果，链接可直接打开。
-                </p>
+                {data.note ? (
+                  <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
+                    真实检索未能返回结果：{data.note}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
+                    网站尚未配置真实检索密钥（Bing 检索服务已于 2025 年 8 月停止服务）。
+                    在部署平台配置 TAVILY_API_KEY 或 BRAVE_API_KEY 后，这里将返回真实全网结果，链接可直接打开。
+                  </p>
+                )}
               </div>
             )}
             {data.note && data.provider !== "mock" && (
