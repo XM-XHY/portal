@@ -63,6 +63,11 @@ export default async function ProductDetail({ params }: { params: { id: string }
           {(item.title.includes("客服") || /copilot/i.test(item.title)) && (
             <OpenChatButton label="💬 在线体验 AI 客服" />
           )}
+          {item.title.includes("获客") && (
+            <Link href="/explore" className="btn-primary block w-full text-center">
+              🚀 进入获客工作台
+            </Link>
+          )}
           <LeadForm title="预约此方案演示" contextLabel={`预约演示：${item.title}`} compact />
           {others.length > 0 && (
             <div className="glass p-5">

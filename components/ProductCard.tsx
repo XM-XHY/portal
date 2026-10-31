@@ -10,10 +10,11 @@ import type { ContentItem } from "@/lib/data/types";
 export default function ProductCard({ product }: { product: ContentItem }) {
   const isChat =
     product.title.includes("客服") || /copilot/i.test(product.title);
+  const isExplore = product.title.includes("获客");
 
   return (
     <Link
-      href={`/products/${product.id}`}
+      href={isExplore ? "/explore" : `/products/${product.id}`}
       onClick={
         isChat
           ? (e) => {
@@ -35,7 +36,7 @@ export default function ProductCard({ product }: { product: ContentItem }) {
         {product.summary}
       </p>
       <div className="mt-4 text-sm font-medium text-brand-blue transition group-hover:translate-x-1">
-        {isChat ? "在线体验对话 →" : "查看详情 →"}
+        {isChat ? "在线体验对话 →" : isExplore ? "进入获客工作台 →" : "查看详情 →"}
       </div>
     </Link>
   );
