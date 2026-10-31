@@ -26,7 +26,7 @@ Vercel 文件系统只读，当前后台的修改只在**单个实例的内存�
 2. 在 Vercel 填入：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`（`SUPABASE_ANON_KEY` 可选）
 3. Redeploy
 
-> 可选增强：`BING_API_KEY`（真实全网检索）、`LLM_API_KEY`（AI 摘要+引用来源）。
+> 可选增强：`BRAVE_API_KEY` / `TAVILY_API_KEY`（真实全网检索，Bing 已于 2025-08-11 退役）、`LLM_API_KEY`（AI 摘要+引用来源）。
 
 ### 部署踩坑记录（供复用）
 
@@ -111,8 +111,10 @@ npm run deploy          # 等价于 vercel --prod
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service_role 密钥，仅服务端使用 |
 | `SUPABASE_ANON_KEY` | 可选 | 前端匿名密钥，当前架构未使用 |
 | `ADMIN_SESSION_SECRET` | ✅ | **后台会话签名密钥，务必设为随机强值**（否则日志会告警、会话可被伪造）。生成：`openssl rand -hex 32` |
-| `BING_API_KEY` | 可选 | 启用真实全网检索（Azure Bing Search v7）。不填则搜索返回内置示例 |
-| `SERPAPI_KEY` | 可选 | Bing 的备用检索源 |
+| `BRAVE_API_KEY` | 可选 | **推荐**。启用真实全网检索（Brave 独立索引，约 5 美元/1000 次，每月赠送 5 美元额度） |
+| `TAVILY_API_KEY` | 可选 | 备选检索源（面向 AI 设计，自带 answer 摘要，约 0.008 美元/次） |
+| `SERPAPI_KEY` | 可选 | 备选检索源（25 美元/月起，含 1000 次） |
+| `SEARCH_PROVIDER` | 可选 | 强制指定 brave/tavily/serpapi/bing，留空自动按优先级选择 |
 | `LLM_API_KEY` | 可选 | 启用 AI 摘要（带引用来源）。OpenAI 兼容接口 |
 | `LLM_BASE_URL` | 可选 | 默认 `https://api.openai.com/v1`，可换 DeepSeek/通义/自建网关 |
 | `LLM_MODEL` | 可选 | 默认 `gpt-4o-mini` |
@@ -127,7 +129,7 @@ npm run deploy          # 等价于 vercel --prod
 
 1. 首页 `/` 打开正常，导航栏显示你的企业名称
 2. `/products`、`/cases`、`/about` 三个页面内容齐全
-3. `/explore` 输入关键词：配了 `BING_API_KEY` 则返回真实结果 +（配了 LLM）AI 摘要；
+3. `/explore` 输入关键词：配了 `BRAVE_API_KEY`/`TAVILY_API_KEY` 则返回真实结果 +（配了 LLM）AI 摘要；
    未配则返回示例结果（页面仍可用）
 4. `/admin` 用 `admin` + 你设定的口令登录 → **站点设置**改公司名称 → 回首页刷新，名称已更新
    （说明 Supabase 读写正常 + 动态渲染生效）
@@ -154,7 +156,8 @@ npm run deploy          # 等价于 vercel --prod
 | 现象 | 原因 / 处理 |
 |---|---|
 | 后台改了企业信息，线上首页不变 | 确认 `ADMIN_SESSION_SECRET` 无关；检查是否 `force-dynamic` 被移除，或浏览器缓存（强刷 Ctrl+F5） |
-| 搜索一直返回示例数据 | 未配置 `BING_API_KEY`（或配额耗尽），属预期兜底行为 |
+| 搜索一直返回示例数据 | 未配置 `BRAVE_API_KEY`/`TAVILY_API_KEY`/`SERPAPI_KEY`（或配额耗尽），属预期兜底行为 |
+| 配了 BING_API_KEY 但搜索仍失败 | Bing Search API 已于 2025-08-11 退役，旧密钥返回 410。请改用 Brave 或 Tavily |
 | 登录提示 401 | 账号为 `admin`（超管）/ `market`（线索）；口令见 `lib/data/defaults.ts` 或 `supabase/schema.sql` 的种子哈希；确认 Supabase `admins` 表已 seed |
 | 页面 500 | Vercel 日志查看；多为 Supabase 密钥错误或表未建（需执行 schema.sql） |
 | 线索提交后后台看不到 | 确认 `SUPABASE_SERVICE_ROLE_KEY` 正确，且 `leads` 表存在 |

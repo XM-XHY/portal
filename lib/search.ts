@@ -8,6 +8,23 @@ export type SearchResult = {
 
 export type SearchSource = { n: number; title: string; url: string };
 
+/**
+ * 检索供应商。
+ * ⚠️ 注意：微软已于 2025-08-11 全面退役 Bing Search API（v7），
+ * 新用户无法注册，旧密钥返回 410 Gone。故 bing 仅作历史兼容保留，不推荐使用。
+ * 推荐顺序：Brave（每月 $5 免费额度）→ Tavily → SerpAPI。
+ */
+export type SearchProvider = "brave" | "tavily" | "serpapi" | "bing" | "mock";
+
+/** 供应商中文名，用于前端展示 */
+export const PROVIDER_LABEL: Record<SearchProvider, string> = {
+  brave: "Brave 全网检索",
+  tavily: "Tavily AI 检索",
+  serpapi: "SerpAPI 全网检索",
+  bing: "Bing 全网检索",
+  mock: "示例数据",
+};
+
 export type SearchResponse = {
   query: string;
   results: SearchResult[];
@@ -16,7 +33,7 @@ export type SearchResponse = {
   /** 摘要中引用的来源清单 */
   sources?: SearchSource[];
   fetchedAt: string;
-  provider: "bing" | "serpapi" | "mock";
+  provider: SearchProvider;
   note?: string;
 };
 
@@ -43,7 +60,85 @@ async function fetchWithTimeout(
 }
 
 /**
- * 真实 Bing Web Search v7 调用。失败抛错，由 searchWeb 统一降级。
+ * Brave Search API（推荐）。
+ * 自建独立索引，返回结构化结果，非抓取 Google/Bing，合规风险低。
+ * 定价：$5/1000 次，每月赠送 $5 额度（≈1000 次/月免费）。
+ * 申请：https://brave.com/search/api/
+ */
+async function braveSearch(query: string): Promise<SearchResult[]> {
+  const key = process.env.BRAVE_API_KEY!;
+  const url = new URL("https://api.search.brave.com/res/v1/web/search");
+  url.searchParams.set("q", query);
+  url.searchParams.set("count", "10");
+  url.searchParams.set("search_lang", "zh-hans");
+  url.searchParams.set("country", "cn");
+  url.searchParams.set("safesearch", "moderate");
+
+  const res = await fetchWithTimeout(
+    url.toString(),
+    {
+      headers: {
+        "X-Subscription-Token": key,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+    8000
+  );
+  if (!res.ok) throw new Error(`Brave ${res.status}`);
+  const data = await res.json();
+  return (data.web?.results || []).map((it: any) => ({
+    title: it.title,
+    url: it.url,
+    snippet: it.description || "",
+    source: hostOf(it.url),
+    publishedAt: it.page_age
+      ? new Date(it.page_age).toISOString().slice(0, 10)
+      : undefined,
+  }));
+}
+
+/**
+ * Tavily Search API（面向 AI 应用设计）。
+ * 单次调用即可返回 results + 自带 answer 摘要，配 LLM 时效果最好。
+ * 定价：约 $0.008/次（basic），注册赠送额度。
+ * 申请：https://tavily.com/
+ */
+async function tavilySearch(
+  query: string
+): Promise<{ results: SearchResult[]; answer?: string }> {
+  const key = process.env.TAVILY_API_KEY!;
+  const res = await fetchWithTimeout(
+    "https://api.tavily.com/search",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        max_results: 10,
+        search_depth: "basic",
+        include_answer: true,
+      }),
+      cache: "no-store",
+    },
+    8000
+  );
+  if (!res.ok) throw new Error(`Tavily ${res.status}`);
+  const data = await res.json();
+  const results: SearchResult[] = (data.results || []).map((it: any) => ({
+    title: it.title,
+    url: it.url,
+    snippet: it.content || "",
+    source: hostOf(it.url),
+  }));
+  return { results, answer: typeof data.answer === "string" ? data.answer : undefined };
+}
+
+/**
+ * ⚠️ 已退役：微软 Bing Search API v7 于 2025-08-11 全面下线，
+ * 新用户无法注册，历史密钥返回 410 Gone。此函数仅作兼容保留，失败即降级。
+ * 迁移建议：改用 BRAVE_API_KEY 或 TAVILY_API_KEY。
  */
 async function bingSearch(query: string): Promise<SearchResult[]> {
   const key = process.env.BING_API_KEY!;
@@ -203,52 +298,90 @@ function mockResults(query: string): SearchResult[] {
 
 /**
  * 全网检索主入口。
- * 优先级：Bing（BING_API_KEY）→ SerpAPI（SERPAPI_KEY）→ 内置示例数据（mock）。
- * 真实检索且配置了 LLM_API_KEY 时，附加"带引用来源的摘要"。
+ *
+ * 供应商优先级（配置了哪个就用哪个，失败自动降级到下一个）：
+ *   Brave(BRAVE_API_KEY) → Tavily(TAVILY_API_KEY) → SerpAPI(SERPAPI_KEY) → Bing(BING_API_KEY，已退役) → 示例数据
+ * 也可用 SEARCH_PROVIDER=brave|tavily|serpapi|bing 强制指定。
+ *
+ * 真实检索且配置了 LLM_API_KEY 时，附加"带引用来源的摘要"；
+ * Tavily 自带 answer，未配 LLM 时也会直接展示。
  */
 export async function searchWeb(query: string): Promise<SearchResponse> {
   const fetchedAt = new Date().toISOString();
   const q = query.trim();
+  const forced = (process.env.SEARCH_PROVIDER || "").trim().toLowerCase();
 
-  if (process.env.BING_API_KEY) {
+  type Attempt = {
+    id: SearchProvider;
+    ready: boolean;
+    run: () => Promise<{ results: SearchResult[]; answer?: string }>;
+  };
+
+  const attempts: Attempt[] = [
+    {
+      id: "brave",
+      ready: !!process.env.BRAVE_API_KEY,
+      run: async () => ({ results: await braveSearch(q) }),
+    },
+    {
+      id: "tavily",
+      ready: !!process.env.TAVILY_API_KEY,
+      run: () => tavilySearch(q),
+    },
+    {
+      id: "serpapi",
+      ready: !!process.env.SERPAPI_KEY,
+      run: async () => ({ results: await serpSearch(q) }),
+    },
+    {
+      id: "bing",
+      ready: !!process.env.BING_API_KEY,
+      run: async () => ({ results: await bingSearch(q) }),
+    },
+  ];
+
+  const ordered = forced
+    ? [...attempts.filter((a) => a.id === forced), ...attempts.filter((a) => a.id !== forced)]
+    : attempts;
+
+  const failures: string[] = [];
+
+  for (const a of ordered) {
+    if (!a.ready) continue;
     try {
-      const results = await bingSearch(q);
+      const { results, answer } = await a.run();
+      if (!results.length) {
+        failures.push(`${a.id}: 无结果`);
+        continue;
+      }
       const llm = await llmSummarize(q, results);
-      return { query: q, results, fetchedAt, provider: "bing", ...llm };
-    } catch {
-      const results = mockResults(q);
+      // 优先用 LLM 带引用摘要；其次用 Tavily 自带 answer
+      const summary = llm?.summary || answer || undefined;
+      const sources =
+        llm?.sources ||
+        (answer ? results.slice(0, 5).map((r, i) => ({ n: i + 1, title: r.title, url: r.url })) : undefined);
       return {
         query: q,
         results,
         fetchedAt,
-        provider: "mock",
-        note: "搜索服务暂不可用，已展示示例数据。",
+        provider: a.id,
+        ...(summary ? { summary } : {}),
+        ...(sources ? { sources } : {}),
       };
+    } catch (e) {
+      failures.push(`${a.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  if (process.env.SERPAPI_KEY) {
-    try {
-      const results = await serpSearch(q);
-      const llm = await llmSummarize(q, results);
-      return { query: q, results, fetchedAt, provider: "serpapi", ...llm };
-    } catch {
-      const results = mockResults(q);
-      return {
-        query: q,
-        results,
-        fetchedAt,
-        provider: "mock",
-        note: "搜索服务暂不可用，已展示示例数据。",
-      };
-    }
-  }
-
+  // 全部失败或未配置任何密钥 → 示例数据
+  const configured = attempts.some((a) => a.ready);
   return {
     query: q,
     results: mockResults(q),
     fetchedAt,
     provider: "mock",
-    note: "未配置 BING_API_KEY / SERPAPI_KEY，当前为示例数据；配置后即为真实全网检索。",
+    note: configured
+      ? `真实检索失败（${failures.join("；")}），已展示示例数据。`
+      : "未配置 BRAVE_API_KEY / TAVILY_API_KEY / SERPAPI_KEY，当前为示例数据；配置后即为真实全网检索。",
   };
 }

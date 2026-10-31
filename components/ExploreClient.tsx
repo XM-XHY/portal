@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { SearchResponse } from "@/lib/search";
+import { PROVIDER_LABEL } from "@/lib/search";
 
 type Lead = { name: string; phone: string; company: string; query: string };
 
@@ -86,7 +87,7 @@ export default function ExploreClient() {
                 关于 “<span className="text-white">{data.query}</span>” 共 {data.results.length} 条结果
               </span>
               <span>
-                来源：{data.provider === "bing" ? "Bing 全网" : "示例数据"} ·{" "}
+                来源：{PROVIDER_LABEL[data.provider] ?? data.provider} ·{" "}
                 {new Date(data.fetchedAt).toLocaleString("zh-CN")}
               </span>
             </div>
