@@ -11,11 +11,19 @@ export default function ProductCard({ product }: { product: ContentItem }) {
   const isChat =
     product.title.includes("客服") || /copilot/i.test(product.title);
   const isExplore = product.title.includes("获客");
+  const isHub =
+    product.title.includes("知识中枢") || product.title.includes("知识管理");
   const isDashboard =
     product.title.includes("看板") ||
     product.title.includes("数据") ||
     /analytics|dashboard/i.test(product.title);
-  const href = isExplore ? "/explore" : isDashboard ? "/dashboard" : `/products/${product.id}`;
+  const href = isExplore
+    ? "/explore"
+    : isHub
+      ? "/hub"
+      : isDashboard
+        ? "/dashboard"
+        : `/products/${product.id}`;
 
   return (
     <Link
@@ -45,9 +53,11 @@ export default function ProductCard({ product }: { product: ContentItem }) {
           ? "在线体验对话 →"
           : isExplore
             ? "进入获客工作台 →"
-            : isDashboard
-              ? "查看实时看板 →"
-              : "查看详情 →"}
+            : isHub
+              ? "进入企业知识中枢 →"
+              : isDashboard
+                ? "查看实时看板 →"
+                : "查看详情 →"}
       </div>
     </Link>
   );

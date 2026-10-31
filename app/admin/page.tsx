@@ -1298,6 +1298,149 @@ function SecuritySettings({ username }: { username: string }) {
   );
 }
 
+/* ---------------- 员工账号（企业知识中枢 /hub 登录账号） ---------------- */
+function EmployeesPanel() {
+  const [items, setItems] = useState<{ id: string; username: string }[]>([]);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admins/employees", { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok) setItems(Array.isArray(data) ? data : []);
+      else setErr(data.error || "加载失败");
+    } catch {
+      setErr("加载失败");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMsg("");
+    setErr("");
+    try {
+      const res = await fetch("/api/admins/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "创建失败");
+      setMsg(`员工「${username}」已开通，可登录 /hub 使用企业知识中枢`);
+      setUsername("");
+      setPassword("");
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "创建失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetPassword(id: string, name: string) {
+    const pw = prompt(`为「${name}」设置新密码（至少 8 位）：`) || "";
+    if (!pw) return;
+    if (pw.length < 8) {
+      alert("密码至少 8 位");
+      return;
+    }
+    const res = await fetch("/api/admins/employees", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, password: pw }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setMsg(`已重置「${name}」的密码`);
+    else setErr(data.error || "重置失败");
+    load();
+  }
+
+  async function remove(id: string, name: string) {
+    if (!confirm(`确定删除员工账号「${name}」？该账号将无法登录知识中枢。`)) return;
+    const res = await fetch(`/api/admins/employees?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setMsg(`已删除「${name}」`);
+    else setErr(data.error || "删除失败");
+    load();
+  }
+
+  return (
+    <div className="glass p-6">
+      <h3 className="text-lg font-semibold text-white">员工账号（企业知识中枢）</h3>
+      <p className="mt-1 text-sm text-slate-400">
+        员工账号仅用于登录 <code className="text-brand-cyan">/hub</code>{" "}
+        检索知识库材料与生成文档，不拥有任何后台管理权限。
+      </p>
+
+      <form onSubmit={add} className="mt-4 flex flex-wrap gap-2">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="账号（字母/数字，2-40 位）"
+          className="input-base max-w-[14rem] flex-1"
+          required
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="初始密码（至少 8 位）"
+          className="input-base max-w-[14rem] flex-1"
+          minLength={8}
+          required
+        />
+        <button type="submit" disabled={busy} className="btn-primary">
+          {busy ? "开通中…" : "+ 开通账号"}
+        </button>
+      </form>
+
+      {msg && <p className="mt-3 text-xs text-emerald-400">{msg}</p>}
+      {err && <p className="mt-3 text-xs text-red-400">{err}</p>}
+
+      <ul className="mt-4 space-y-2">
+        {items.map((a) => (
+          <li
+            key={a.id}
+            className="flex items-center gap-3 rounded-lg border border-white/10 p-3 text-sm"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/5 text-base">👤</span>
+            <span className="text-white">{a.username}</span>
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={() => resetPassword(a.id, a.username)}
+                className="rounded-lg border border-white/15 px-2 py-1 text-xs hover:bg-white/10"
+              >
+                重置密码
+              </button>
+              <button
+                onClick={() => remove(a.id, a.username)}
+                className="rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-500/10"
+              >
+                删除
+              </button>
+            </div>
+          </li>
+        ))}
+        {items.length === 0 && (
+          <li className="rounded-lg border border-white/10 p-4 text-center text-sm text-slate-500">
+            还没有员工账号。用上方表单开通第一个，员工即可登录 /hub。
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 /* ---------------- 用户与角色 ---------------- */
 function UsersManager() {
   const [admins, setAdmins] = useState<{ username: string; role: Role }[]>([]);
@@ -1309,9 +1452,11 @@ function UsersManager() {
   return (
     <div className="space-y-6">
       <div className="glass p-6">
-        <h3 className="text-lg font-semibold text-white">账号</h3>
+        <h3 className="text-lg font-semibold text-white">后台账号</h3>
         <ul className="mt-4 space-y-2">
-          {admins.map((a) => (
+          {admins
+            .filter((a) => a.role !== "employee")
+            .map((a) => (
             <li key={a.username} className="flex items-center gap-3 rounded-lg border border-white/10 p-3">
               <span className="text-white">{a.username}</span>
               <span className="rounded-full bg-brand-violet/20 px-3 py-1 text-xs text-brand-violet">
@@ -1321,6 +1466,8 @@ function UsersManager() {
           ))}
         </ul>
       </div>
+
+      <EmployeesPanel />
 
       <div className="glass p-6">
         <h3 className="text-lg font-semibold text-white">RBAC 权限矩阵</h3>

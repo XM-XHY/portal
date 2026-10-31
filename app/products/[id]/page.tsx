@@ -138,6 +138,11 @@ export default async function ProductDetail({ params }: { params: { id: string }
           {/客服|copilot/i.test(item.title) && (
             <OpenChatButton label="💬 在线体验 AI 客服" />
           )}
+          {/知识中枢|知识管理/.test(item.title) && (
+            <Link href="/hub" className="btn-primary block w-full text-center">
+              📚 进入企业知识中枢
+            </Link>
+          )}
           {item.title.includes("获客") && (
             <Link href="/explore" className="btn-primary block w-full text-center">
               🚀 进入获客工作台

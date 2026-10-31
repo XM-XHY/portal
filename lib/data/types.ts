@@ -1,4 +1,4 @@
-export type Role = "super" | "editor" | "lead" | "viewer";
+export type Role = "super" | "editor" | "lead" | "viewer" | "employee";
 
 export type SiteInfo = {
   companyName: string;
@@ -97,6 +97,10 @@ export interface Repo {
   updateSite(patch: Partial<SiteInfo>): Promise<SiteInfo>;
   getAdmins(): Promise<Admin[]>;
   setAdminPassword(id: string, newPw: string): Promise<boolean>;
+  /** 新增账号（管理员或员工）；用户名重复时抛错 */
+  addAdmin(input: { username: string; password: string; role: Role }): Promise<Admin>;
+  /** 删除账号（用于移除员工账号）；不存在返回 false */
+  removeAdmin(id: string): Promise<boolean>;
   addLead(input: Omit<Lead, "id" | "at" | "status">): Promise<Lead>;
   getLeads(): Promise<Lead[]>;
   updateLead(id: string, patch: Partial<Pick<Lead, "status" | "note">>): Promise<Lead | null>;

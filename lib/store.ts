@@ -23,6 +23,20 @@ export async function setAdminPassword(id: string, newPw: string): Promise<boole
   return getRepo().setAdminPassword(id, newPw);
 }
 
+/** 新增账号（管理员 / 员工），用户名重复时抛错 */
+export async function addAdmin(input: {
+  username: string;
+  password: string;
+  role: import("./data/types").Role;
+}) {
+  return getRepo().addAdmin(input);
+}
+
+/** 删除账号（用于移除员工账号） */
+export async function removeAdmin(id: string): Promise<boolean> {
+  return getRepo().removeAdmin(id);
+}
+
 export async function addLead(input: {
   name: string;
   phone: string;

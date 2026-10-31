@@ -110,6 +110,38 @@ export class SupabaseRepo implements Repo {
     return true;
   }
 
+  async addAdmin(input: {
+    username: string;
+    password: string;
+    role: Admin["role"];
+  }): Promise<Admin> {
+    const admins = await this.getAdmins();
+    const username = input.username.trim();
+    if (admins.some((a) => a.username === username)) {
+      throw new Error("用户名已存在");
+    }
+    const row = {
+      id: `a_${crypto.randomUUID().slice(0, 8)}`,
+      username,
+      role: input.role,
+      pw_hash: hash(input.password),
+    };
+    const { data, error } = await this.sb.from("admins").insert(row).select().single();
+    if (error || !data) throw new Error(error?.message || "创建账号失败");
+    return fromAdminRow(data);
+  }
+
+  async removeAdmin(id: string): Promise<boolean> {
+    const { data, error } = await this.sb
+      .from("admins")
+      .delete()
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return false;
+    return true;
+  }
+
   // ---------- 线索 ----------
   async addLead(input: Omit<Lead, "id" | "at" | "status">): Promise<Lead> {
     const { data, error } = await this.sb

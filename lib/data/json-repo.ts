@@ -114,6 +114,36 @@ export class JsonRepo implements Repo {
     return true;
   }
 
+  async addAdmin(input: {
+    username: string;
+    password: string;
+    role: Admin["role"];
+  }): Promise<Admin> {
+    const db = await this.read();
+    const username = input.username.trim();
+    if (db.admins.some((a) => a.username === username)) {
+      throw new Error("用户名已存在");
+    }
+    const admin: Admin = {
+      id: `a_${crypto.randomUUID().slice(0, 8)}`,
+      username,
+      role: input.role,
+      pwHash: hash(input.password),
+    };
+    db.admins.push(admin);
+    await this.write(db);
+    return admin;
+  }
+
+  async removeAdmin(id: string): Promise<boolean> {
+    const db = await this.read();
+    const before = db.admins.length;
+    db.admins = db.admins.filter((a) => a.id !== id);
+    if (db.admins.length === before) return false;
+    await this.write(db);
+    return true;
+  }
+
   async addLead(input: Omit<Lead, "id" | "at" | "status">): Promise<Lead> {
     const db = await this.read();
     const lead: Lead = {
