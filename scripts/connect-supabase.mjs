@@ -8,7 +8,12 @@
  */
 import { createHash } from "node:crypto";
 
-const KEY = process.argv[2] || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+/** --env-only：跳过权限校验，只把密钥写入 Vercel（用于表权限稍后补授权的场景） */
+const ENV_ONLY = process.argv.includes("--env-only");
+const KEY =
+  process.argv.filter((a) => !a.startsWith("--")).slice(2)[0] ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
 const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://umtqzvgqblleyjxohfwb.supabase.co";
 const REST = SUPABASE_URL.replace(/\/+$/, "") + "/rest/v1/";
@@ -43,6 +48,10 @@ console.log("=== 1) 校验密钥 ===");
 if (!KEY) { console.error("缺少密钥参数"); process.exit(1); }
 console.log("密钥角色 role =", jwtRole(KEY));
 
+if (ENV_ONLY) {
+  console.log("  （--env-only：跳过表级权限校验）");
+} else {
+
 const TABLES = ["site_info", "admins", "contents", "leads", "search_logs", "audit_logs"];
 let ok = true;
 for (const t of TABLES) {
@@ -75,20 +84,39 @@ if (!(w.status >= 200 && w.status < 300)) {
   console.error("密钥无写权限，已中止。");
   process.exit(4);
 }
+}
 
 console.log("\n=== 2) 写入 Vercel 环境变量 ===");
 if (!VERCEL_TOKEN) { console.error("缺少 VERCEL_TOKEN，跳过部署环节"); process.exit(0); }
 const vh = { Authorization: "Bearer " + VERCEL_TOKEN, "Content-Type": "application/json" };
 
+// 先读取现有变量，已存在则 PATCH 更新，不存在则 POST 新建
+const existing = await req(
+  `https://api.vercel.com/v9/projects/${PROJECT_ID}/env?teamId=${TEAM_ID}`,
+  { headers: vh }
+);
+const byKey = new Map((existing.body?.envs || []).map((e) => [e.key, e]));
+
 for (const [key, value] of [
   ["SUPABASE_URL", SUPABASE_URL.replace(/\/rest\/v1\/?$/, "")],
   ["SUPABASE_SERVICE_ROLE_KEY", KEY],
 ]) {
-  const r = await req(
-    `https://api.vercel.com/v10/projects/${PROJECT_ID}/env?teamId=${TEAM_ID}`,
-    { method: "POST", headers: vh, body: JSON.stringify({ key, value, type: "encrypted", target: ["production", "preview", "development"] }) }
-  );
-  console.log(`  env ${key}: ${r.status} ${r.status === 201 || r.status === 200 ? "已写入" : JSON.stringify(r.body).slice(0, 200)}`);
+  const old = byKey.get(key);
+  const payload = { key, value, type: "encrypted", target: ["production", "preview", "development"] };
+  let r;
+  if (old) {
+    r = await req(
+      `https://api.vercel.com/v10/projects/${PROJECT_ID}/env/${old.id}?teamId=${TEAM_ID}`,
+      { method: "PATCH", headers: vh, body: JSON.stringify({ ...payload, key: undefined }) }
+    );
+  } else {
+    r = await req(
+      `https://api.vercel.com/v10/projects/${PROJECT_ID}/env?teamId=${TEAM_ID}`,
+      { method: "POST", headers: vh, body: JSON.stringify(payload) }
+    );
+  }
+  const okWrite = r.status === 200 || r.status === 201;
+  console.log(`  env ${key}: ${r.status} ${okWrite ? (old ? "已更新" : "已写入") + ` (值末 6 位 …${value.slice(-6)})` : JSON.stringify(r.body).slice(0, 200)}`);
 }
 
 console.log("\n=== 3) 触发重新部署 ===");
@@ -110,8 +138,30 @@ for (const [desc, url, body] of [
   console.log(`  ${desc}: ${r.status} ${JSON.stringify(r.body).slice(0, 160)}`);
 }
 if (!deployId) {
-  console.log("  未能自动获取新部署 id，请到 Vercel 控制台手动 Redeploy。");
-  process.exit(0);
+  // API redeploy 端点对未关联 Git 仓库的项目不可用，退回 Vercel CLI 重新上传
+  console.log("  API redeploy 不可用（项目未关联 Git），改用 Vercel CLI 重新上传…");
+  const { spawnSync } = await import("node:child_process");
+  const cli = spawnSync(
+    "npx",
+    ["vercel", "deploy", "--prod", "--yes", "--token", VERCEL_TOKEN],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, VERCEL_ORG_ID: TEAM_ID, VERCEL_PROJECT_ID: PROJECT_ID },
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  );
+  const out = (cli.stdout || "") + (cli.stderr || "");
+  const m = out.match(/https:\/\/[^\s]+vercel\.app/g);
+  console.log("  CLI 退出码:", cli.status);
+  if (cli.status === 0) {
+    console.log("  部署成功:", m ? m[m.length - 1] : "(见 Vercel 控制台)");
+    console.log("\n  跳过轮询，直接进行线上验证…");
+  } else {
+    console.log(out.slice(-800));
+    console.log("  CLI 部署失败，请到 Vercel 控制台手动 Redeploy。");
+    process.exit(0);
+  }
 }
 
 console.log("\n=== 4) 等待部署完成 ===");
