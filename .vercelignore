@@ -1,0 +1,6 @@
+# 运行时数据（Vercel 为只读文件系统，避免上传本地演示库）
+# 注意：必须带前导斜杠，否则会误排除源码目录 lib/data/
+/data
+/.next
+/node_modules
+*.log

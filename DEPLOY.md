@@ -5,6 +5,39 @@
 
 ---
 
+## 零、当前已上线的部署（2026-10-31）
+
+| 项 | 值 |
+|---|---|
+| 线上地址 | **https://xm-tech-portal.vercel.app** |
+| Vercel 控制台 | https://vercel.com/xhy6/xm-tech-portal |
+| 团队 / 项目 | `xhy6` / `xm-tech-portal`（`prj_LQQvY8YKmkX9ufaVMIlXXc5rJ3za`） |
+| 部署状态 | READY（构建 exit 0，全部路由 ƒ 动态渲染） |
+| 已配置环境变量 | `ADMIN_SESSION_SECRET`（随机 32 字节，已加密存储）、`SEARCH_MKT=zh-CN` |
+| 部署保护 | 已关闭（ssoProtection=null），访客可直接访问 |
+| 当前数据层 | **JSON 文件（未接数据库）** → 后台修改**不会持久化** |
+
+### ⚠️ 上线后必须补的一步：接 Supabase 才能持久保存
+
+Vercel 文件系统只读，当前后台的修改只在**单个实例的内存中**生效，刷新或换实例即回到默认值。
+只要把下面三个环境变量补进 Vercel（**Settings → Environment Variables**），再 Redeploy 一次即可持久，**代码零改动**：
+
+1. 先在 Supabase **SQL Editor** 执行 `supabase/schema.sql`
+2. 在 Vercel 填入：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`（`SUPABASE_ANON_KEY` 可选）
+3. Redeploy
+
+> 可选增强：`BING_API_KEY`（真实全网检索）、`LLM_API_KEY`（AI 摘要+引用来源）。
+
+### 部署踩坑记录（供复用）
+
+- `.vercelignore` 中若写 `data`（无前导斜杠），会匹配**任意层级**的 `data` 目录，
+  把源码 `lib/data/` 一并排除，导致构建报 `Module not found: Can't resolve './data/types'`。
+  必须写成 `/data`。
+- 新建的 Vercel 团队默认开启 **Vercel Authentication**（`ssoProtection`），
+  会让访客被登录墙拦截；需通过 API 将其置为 `null` 关闭。
+
+---
+
 ## 一、准备 Supabase（数据层）
 
 > 若不配置 Supabase，站点会退化为 JSON 文件存储；而 Vercel 文件系统只读，
