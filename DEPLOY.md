@@ -43,16 +43,38 @@ Vercel 文件系统只读，当前后台的修改只在**单个实例的内存�
 > 若不配置 Supabase，站点会退化为 JSON 文件存储；而 Vercel 文件系统只读，
 > 数据将无法持久化（页面不会报错，但后台修改重启即丢失）。因此**线上必须配 Supabase**。
 
-1. 打开 https://supabase.com 创建项目（免费额度足够）。
-2. 进入 **SQL Editor**，把 `supabase/schema.sql` 的内容**整段粘贴执行**。
-   - 会创建 6 张表：site_info / admins / leads / contents / search_logs / audit_logs
-   - 并写入初始数据（企业信息、管理员、4 个产品、3 个案例、3 条资讯）
-3. 进入 **Project Settings → API**，复制三项：
-   - `Project URL` → `SUPABASE_URL`
-   - `service_role` key（**服务端专用，切勿暴露到浏览器**）→ `SUPABASE_SERVICE_ROLE_KEY`
-   - `anon` key（可选）→ `SUPABASE_ANON_KEY`
+### 1-1 从零创建项目（照做即可，约 5 分钟）
 
-应用启动时检测到 `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`，会自动切换到 Supabase 存储。
+1. 打开 https://supabase.com → 右上角 **Start your project**（用 GitHub 或邮箱注册，免费）。
+2. 进入后点 **New project**：
+   - Organization：默认即可
+   - **Name**：`xm-tech-portal`（随意）
+   - **Database Password**：点 `Generate a password` 自动生成一个，**务必复制保存**（后续基本不用，但丢了无法找回）
+   - **Region**：选 **Southeast Asia (Singapore)** `ap-southeast-1`（离国内最近、延迟最低）
+   - 点 **Create new project**，等待约 2 分钟初始化。
+3. 初始化完成后，左侧菜单点 **SQL Editor** → **New query**，
+   把项目根目录 `supabase/schema.sql` 的**全部内容**复制粘贴进编辑框 → 右下角 **Run**（或 Ctrl+Enter）。
+   - 看到 `Success. No rows returned` 即为成功
+   - 会创建 6 张表：site_info / admins / leads / contents / search_logs / audit_logs
+   - 并写入初始数据（企业信息、管理员账号、4 个产品、3 个案例、3 条资讯）
+   - 该脚本可重复执行（用 `on conflict do update`），改了口令后重跑即可刷新
+4. 左侧菜单 **Project Settings**（齿轮图标） → **API**，复制这两项发给我即可：
+   - **Project URL** → 形如 `https://abcdefgh.supabase.co` → 对应 `SUPABASE_URL`
+   - **Project API keys → `service_role`** → 一长串 `eyJhbGci...` → 对应 `SUPABASE_SERVICE_ROLE_KEY`
+     （⚠️ 这是服务端专用密钥，拥有完全权限，**不要**写进前端代码或发给不可信方；
+     我只写入 Vercel 的加密环境变量）
+   - `anon` key 为可选项，本项目当前未使用。
+
+### 1-2 拿到凭据后怎么给我
+
+直接在对话里按下面格式发我就行（我会写入 Vercel 并 Redeploy，代码零改动）：
+
+```
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
+```
+
+应用启动时检测到这两个变量，会自动从 JSON 存储切换为 Supabase 存储。
 
 ---
 
