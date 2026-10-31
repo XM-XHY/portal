@@ -13,11 +13,12 @@ export function defaultSite(): SiteInfo {
   };
 }
 
-// 与后台登录页帮助文本、.env.example 保持一致。生产务必改密码或接入身份服务。
+// 初识管理员口令。已按用户要求统一为强口令（见 .env.example 说明）。
+// ⚠️ 站点已公网可访问，上线后请在「后台 → 账号安全」再次修改，或接入身份服务。
 export function defaultAdmins(): Admin[] {
   return [
-    { id: "a1", username: "admin", role: "super", pwHash: hash("admin123") },
-    { id: "a2", username: "market", role: "lead", pwHash: hash("market123") },
+    { id: "a1", username: "admin", role: "super", pwHash: hash("#XHY-@350211") },
+    { id: "a2", username: "market", role: "lead", pwHash: hash("#XHY-@350211") },
   ];
 }
 

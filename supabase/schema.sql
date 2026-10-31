@@ -94,9 +94,9 @@ on conflict (id) do nothing;
 -- 生产务必通过后台"账号安全"修改密码，或在此替换为你的强口令哈希。
 -- 哈希算法：sha256('xx-tech-static-salt-v1' + 明文口令)
 insert into admins (id, username, role, pw_hash) values
-  ('a1', 'admin',  'super', '53a0853d8bd62d3d63c1074164cd03a90cd704114722969ba613b88aad376f49'),
-  ('a2', 'market', 'lead',  'b32bcd3361eb289aba4c01659d4d9b564ce5657e26ec0f330d3eedc8c7a9b973')
-on conflict (id) do nothing;
+  ('a1', 'admin',  'super', 'cef30ce13b6c2f133c1feb19497efc1442b667c8e90e5da7a1230cfd0247db35'),
+  ('a2', 'market', 'lead',  'cef30ce13b6c2f133c1feb19497efc1442b667c8e90e5da7a1230cfd0247db35')
+on conflict (id) do update set pw_hash = excluded.pw_hash;
 
 -- 内容初始示例（与 lib/data/defaults.ts 保持一致）
 insert into contents (id, type, title, tag, summary, body, icon, tags, client, industry, result, at, "order") values

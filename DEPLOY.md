@@ -107,10 +107,11 @@ npm run deploy          # 等价于 vercel --prod
 2. `/products`、`/cases`、`/about` 三个页面内容齐全
 3. `/explore` 输入关键词：配了 `BING_API_KEY` 则返回真实结果 +（配了 LLM）AI 摘要；
    未配则返回示例结果（页面仍可用）
-4. `/admin` 用 `admin / admin123` 登录 → **站点设置**改公司名称 → 回首页刷新，名称已更新
+4. `/admin` 用 `admin` + 你设定的口令登录 → **站点设置**改公司名称 → 回首页刷新，名称已更新
    （说明 Supabase 读写正常 + 动态渲染生效）
 5. 后台提交一条测试线索 → Supabase 控制台 `leads` 表能看到该记录
 6. **立即修改默认密码**：后台「账号安全」页修改，或在上线前改 `supabase/schema.sql` 的种子哈希
+   （当前初始口令已按用户要求设为强口令，登录页不再对外展示明文口令）
 
 ---
 
@@ -132,6 +133,6 @@ npm run deploy          # 等价于 vercel --prod
 |---|---|
 | 后台改了企业信息，线上首页不变 | 确认 `ADMIN_SESSION_SECRET` 无关；检查是否 `force-dynamic` 被移除，或浏览器缓存（强刷 Ctrl+F5） |
 | 搜索一直返回示例数据 | 未配置 `BING_API_KEY`（或配额耗尽），属预期兜底行为 |
-| 登录提示 401 | 默认账号 `admin/admin123`、`market/market123`；确认 Supabase `admins` 表已 seed |
+| 登录提示 401 | 账号为 `admin`（超管）/ `market`（线索）；口令见 `lib/data/defaults.ts` 或 `supabase/schema.sql` 的种子哈希；确认 Supabase `admins` 表已 seed |
 | 页面 500 | Vercel 日志查看；多为 Supabase 密钥错误或表未建（需执行 schema.sql） |
 | 线索提交后后台看不到 | 确认 `SUPABASE_SERVICE_ROLE_KEY` 正确，且 `leads` 表存在 |

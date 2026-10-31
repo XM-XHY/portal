@@ -179,9 +179,10 @@ function Login({ onOk }: { onOk: () => void }) {
           </button>
         </form>
         <div className="mt-4 rounded-lg border border-white/10 p-3 text-xs text-slate-400">
-          演示账号：<br />
-          超级管理员 <code>admin / admin123</code>（全部权限）<br />
-          线索管理员 <code>market / market123</code>（仅线索与日志）
+          可用账号：<br />
+          <code>admin</code>（超级管理员，全部权限）<br />
+          <code>market</code>（线索管理员，仅线索与日志）<br />
+          <span className="text-slate-500">口令由管理员设定，不再对外展示。</span>
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           仅演示用途 · <Link href="/" className="text-brand-cyan hover:underline">返回官网</Link>
