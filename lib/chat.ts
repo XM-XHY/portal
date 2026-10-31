@@ -147,13 +147,29 @@ export const FALLBACK_REPLY = (k: Knowledge): string =>
   ].join("\n");
 
 /** LLM system prompt：基于知识库回答，不许编造 */
-export function buildSystemPrompt(k: Knowledge): string {
-  return [
+export function buildSystemPrompt(k: Knowledge, kbText?: string): string {
+  const lines = [
     `你是"${brandName(k.site.companyName)}"官网的 AI 客服助手。用简体中文回答，语气专业友好、简洁（一般不超过 180 字）。`,
     `只能依据下面的企业知识库回答；知识库没有的信息要坦白说不确定，并引导用户致电 ${k.site.phone} 或在官网留言，绝不能编造。`,
     `适当引导用户留资（留下联系方式）或查看官网对应页面。不要输出 markdown 标题，可用短列表。`,
     ``,
     `===== 企业知识库 =====`,
     buildKnowledgeText(k),
-  ].join("\n");
+  ];
+  if (kbText && kbText.trim()) {
+    lines.push(``, `===== 知识库文档（管理员上传，优先依据作答，可引用 [知识N] 标号）=====`, kbText.trim());
+  }
+  return lines.join("\n");
+}
+
+/** 无 LLM 时从知识库命中片段直接拼装回复 */
+export function kbDirectReply(query: string, hits: { doc: { title: string }; chunk: string; score: number }[]): string | null {
+  if (!hits.length) return null;
+  const head = `根据知识库《${hits[0].doc.title}》：`;
+  const body = hits
+    .slice(0, 2)
+    .map((h, i) => `${i === 0 ? "" : "\n"}${h.chunk.trim()}`)
+    .join("\n———\n");
+  const tail = `\n\n如需更完整的解答，可以致电或留言，顾问会结合这份资料为你详细说明。`;
+  return `${head}\n${body}${tail}`;
 }

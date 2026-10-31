@@ -183,7 +183,8 @@ export class SupabaseRepo implements Repo {
   async saveContents(items: ContentItem[]): Promise<ContentItem[]> {
     const rows = items.map(toContentRow);
     if (rows.length) {
-      await this.sb.from("contents").upsert(rows, { onConflict: "id" });
+      const { error } = await this.sb.from("contents").upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(`contents 写入失败: ${error.message} (code=${error.code})`);
     }
     const ids = items.map((i) => i.id);
     if (ids.length === 0) {

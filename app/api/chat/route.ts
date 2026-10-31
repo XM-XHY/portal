@@ -5,8 +5,10 @@ import {
   type Knowledge,
   buildSystemPrompt,
   ruleReply,
+  kbDirectReply,
   FALLBACK_REPLY,
 } from "@/lib/chat";
+import { searchKnowledge, formatHits } from "@/lib/kb";
 
 export const dynamic = "force-dynamic";
 
@@ -93,25 +95,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "缺少用户消息" }, { status: 400 });
   }
 
-  // 企业知识库（实时读库，后台改完即生效）
-  const [site, products, cases, news] = await Promise.all([
+  // 企业知识库（实时读库，后台改完即生效）+ 管理员上传的 KB 文档
+  const [site, products, cases, news, kbDocs] = await Promise.all([
     getSite(),
     getContents("product"),
     getContents("case"),
     getContents("news"),
+    getContents("kb" as any),
   ]);
   const knowledge: Knowledge = { site, products, cases, news };
 
-  // 1) 优先真实 LLM
-  const llm = await llmReply(buildSystemPrompt(knowledge), history);
+  // 知识库文档检索：从上传的 Word/Excel/PDF 中找与问题最相关的片段
+  const kbHits = kbDocs.length ? searchKnowledge(kbDocs, lastUser.content) : [];
+  const kbText = kbHits.length ? formatHits(kbHits) : undefined;
+
+  // 1) 优先真实 LLM（命中知识库时把文档片段一并注入）
+  const llm = await llmReply(buildSystemPrompt(knowledge, kbText), history);
   if (llm) {
     return NextResponse.json(
-      { reply: llm, engine: "llm" },
+      {
+        reply: llm,
+        engine: "llm",
+        kbSources: kbHits.length ? kbHits.map((h) => h.doc.title) : undefined,
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   }
 
-  // 2) 规则引擎兜底（未配 LLM 或 LLM 失败）
+  // 2) 知识库文档直接应答（未配 LLM 时的精准兜底）
+  if (kbHits.length) {
+    return NextResponse.json(
+      { reply: kbDirectReply(lastUser.content, kbHits) ?? "", engine: "kb", kbSources: kbHits.map((h) => h.doc.title) },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  // 3) 规则引擎兜底
   const rule = ruleReply(lastUser.content, knowledge);
   return NextResponse.json(
     { reply: rule ?? FALLBACK_REPLY(knowledge), engine: "rules" },

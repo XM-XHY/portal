@@ -23,7 +23,7 @@ export type Lead = {
   note?: string;
 };
 
-export type ContentType = "news" | "product" | "case";
+export type ContentType = "news" | "product" | "case" | "kb";
 
 /**
  * 统一内容实体：资讯（news）、产品（product）、案例（case）共用。

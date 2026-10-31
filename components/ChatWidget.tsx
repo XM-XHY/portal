@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
-type Msg = { role: "user" | "assistant"; content: string; engine?: "llm" | "rules" };
+type Msg = { role: "user" | "assistant"; content: string; engine?: "llm" | "rules" | "kb" };
 
 const QUICK_QUESTIONS = [
   "你们能做什么？",
@@ -11,6 +11,34 @@ const QUICK_QUESTIONS = [
   "有哪些客户案例？",
   "怎么联系你们？",
 ];
+
+const BALL_SIZE = 56;
+const PANEL_W = 380;
+const POS_KEY = "chat-widget-pos-v1";
+
+type Pos = { x: number; y: number };
+
+/** 从 localStorage 读上次位置（越界则回退默认值） */
+function loadPos(): Pos | null {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Pos;
+    if (typeof p.x === "number" && typeof p.y === "number") return p;
+  } catch {}
+  return null;
+}
+
+function clampPos(x: number, y: number, w: number, h: number): Pos {
+  // SSR 安全：无 window 时原样返回（客户端挂载后会重新 clamp）
+  if (typeof window === "undefined") return { x, y };
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  return {
+    x: Math.min(Math.max(8, x), Math.max(8, vw - w - 8)),
+    y: Math.min(Math.max(8, y), Math.max(8, vh - h - 8)),
+  };
+}
 
 /** 极简渲染：换行 + [文字](url) 链接，不引入 markdown 依赖 */
 function renderContent(text: string) {
@@ -51,8 +79,64 @@ export default function ChatWidget() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // —— 拖拽状态（悬浮球位置；窗口位置由球位推导）——
+  const [ballPos, setBallPos] = useState<Pos | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragState = useRef({
+    active: false, moved: false,
+    startX: 0, startY: 0, origX: 0, origY: 0,
+  });
+
   const hidden = pathname?.startsWith("/admin");
   const companyName = "XX 科技";
+
+  // 初始化：读取上次拖拽位置（客户端挂载后执行，避免 SSR 不一致）
+  useEffect(() => {
+    setBallPos(loadPos());
+  }, []);
+
+  const defaultBall = (): Pos =>
+    typeof window === "undefined"
+      ? { x: 0, y: 0 }
+      : { x: window.innerWidth - BALL_SIZE - 24, y: window.innerHeight - BALL_SIZE - 24 };
+
+  /** 指针按下：记录起点，捕获指针 */
+  const onBallPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return; // 仅左键
+    const base = ballPos ?? defaultBall();
+    dragState.current = {
+      active: true, moved: false,
+      startX: e.clientX, startY: e.clientY,
+      origX: base.x, origY: base.y,
+    };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  /** 指针移动：超过 5px 视为拖拽 */
+  const onBallPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const s = dragState.current;
+    if (!s.active) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    s.moved = true;
+    setDragging(true);
+    setBallPos(clampPos(s.origX + dx, s.origY + dy, BALL_SIZE, BALL_SIZE));
+  };
+
+  /** 指针抬起：未移动 → 视为点击开关窗口 */
+  const onBallPointerUp = () => {
+    const s = dragState.current;
+    if (!s.active) return;
+    s.active = false;
+    setDragging(false);
+    if (!s.moved) {
+      setOpen((v) => !v);
+      setNudge(false);
+    } else if (ballPos) {
+      try { localStorage.setItem(POS_KEY, JSON.stringify(ballPos)); } catch {}
+    }
+  };
 
   // 初始欢迎语
   useEffect(() => {
@@ -89,6 +173,17 @@ export default function ChatWidget() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // 窗口尺寸变化时把位置拉回可视区
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const onResize = () => {
+      setBallPos((p) => (p ? clampPos(p.x, p.y, BALL_SIZE, BALL_SIZE) : p));
+      bump((v) => v + 1);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const send = useCallback(
     async (text: string) => {
@@ -133,31 +228,49 @@ export default function ChatWidget() {
 
   if (hidden) return null;
 
+  // 悬浮球与窗口的固定定位（仅在拖拽过后启用；SSR 阶段不计算）
+  const pos = ballPos ?? defaultBall();
+  const panelH = Math.min((typeof window === "undefined" ? 800 : window.innerHeight) * 0.7, 560);
+  const panelLeft = clampPos(pos.x + BALL_SIZE / 2 - PANEL_W / 2, 0, PANEL_W, 0).x;
+  const above = pos.y - panelH - 12;
+  const panelTop = above >= 8 ? above : clampPos(0, pos.y + BALL_SIZE + 12, 0, panelH).y;
+  const useFixed = ballPos !== null; // 拖拽过后窗口跟随球；否则走原 CSS 默认位
+
   return (
     <>
-      {/* 悬浮球 */}
+      {/* 悬浮球（可拖拽移动） */}
       <button
-        onClick={() => { setOpen((v) => !v); setNudge(false); }}
+        onPointerDown={onBallPointerDown}
+        onPointerMove={onBallPointerMove}
+        onPointerUp={onBallPointerUp}
+        onPointerCancel={onBallPointerUp}
         aria-label="打开智能客服"
-        className="fixed bottom-20 right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-brand-blue to-brand-violet text-2xl shadow-lg shadow-brand-blue/30 transition hover:scale-105 md:bottom-6 md:right-6"
+        style={useFixed ? { left: pos.x, top: pos.y } : undefined}
+        className={`fixed bottom-20 right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-brand-blue to-brand-violet text-2xl shadow-lg shadow-brand-blue/30 transition hover:scale-105 md:bottom-6 md:right-6 ${dragging ? "cursor-grabbing scale-105" : "cursor-grab"} touch-none select-none`}
       >
         {open ? "✕" : "💬"}
         {!open && nudge && (
-          <span className="absolute -left-2 top-1 h-3 w-3 animate-ping rounded-full bg-brand-cyan/70" />
+          <span className="pointer-events-none absolute -left-2 top-1 h-3 w-3 animate-ping rounded-full bg-brand-cyan/70" />
         )}
       </button>
 
       {/* 轻提示气泡 */}
       {!open && nudge && (
-        <div className="fixed bottom-[8.5rem] right-4 z-50 max-w-[220px] rounded-2xl rounded-br-sm border border-white/10 bg-slate-900/95 p-3 text-xs leading-relaxed text-slate-300 shadow-xl md:bottom-24 md:right-6">
-          有 AI 方面的问题？点我可以直接聊 🙂
+        <div
+          style={useFixed ? { left: Math.max(8, pos.x - 160), top: Math.max(8, pos.y - 64) } : undefined}
+          className="fixed bottom-[8.5rem] right-4 z-50 max-w-[220px] rounded-2xl rounded-br-sm border border-white/10 bg-slate-900/95 p-3 text-xs leading-relaxed text-slate-300 shadow-xl md:bottom-24 md:right-6"
+        >
+          有 AI 方面的问题？点我可以直接聊，也可以按住拖到我方便的位置 🙂
           <button onClick={() => setNudge(false)} className="mt-1 block text-slate-500 hover:text-slate-300">知道了</button>
         </div>
       )}
 
-      {/* 聊天窗口 */}
+      {/* 聊天窗口（跟随悬浮球位置） */}
       {open && (
-        <div className="fixed inset-x-3 bottom-36 z-50 flex h-[70vh] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-24 md:right-6 md:w-[380px]">
+        <div
+          style={useFixed ? { left: panelLeft, top: panelTop, width: PANEL_W } : undefined}
+          className="fixed inset-x-3 bottom-36 z-50 flex h-[70vh] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-24 md:right-6 md:w-[380px]"
+        >
           {/* 头部 */}
           <div className="flex items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">
             <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-blue to-brand-violet text-lg">🤖</div>
@@ -185,7 +298,7 @@ export default function ChatWidget() {
                   {renderContent(m.content)}
                   {m.role === "assistant" && m.engine && (
                     <div className="mt-1.5 text-[10px] text-slate-500">
-                      {m.engine === "llm" ? "AI 模型生成" : "知识库应答"}
+                      {m.engine === "llm" ? "AI 模型生成" : m.engine === "kb" ? "依据知识库文档" : "知识库应答"}
                     </div>
                   )}
                 </div>

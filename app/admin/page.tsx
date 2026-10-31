@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ROLE_LABELS,
@@ -60,6 +60,7 @@ export default function AdminPage() {
   const allTabs: { key: string; label: string; perm: Permission }[] = [
     { key: "site", label: "站点设置", perm: "settings.manage" },
     { key: "content", label: "内容管理", perm: "content.manage" },
+    { key: "kb", label: "知识库", perm: "content.manage" },
     { key: "leads", label: "线索管理", perm: "leads.view" },
     { key: "logs", label: "获客日志", perm: "search.logs" },
     { key: "audit", label: "操作审计", perm: "audit.view" },
@@ -113,6 +114,7 @@ export default function AdminPage() {
         <div className="mt-6">
           {active === "site" && <SiteSettings />}
           {active === "content" && <ContentManager />}
+          {active === "kb" && <KbManager />}
           {active === "leads" && <LeadsManager role={me.role} />}
           {active === "logs" && <SearchLogs />}
           {active === "audit" && <AuditViewer />}
@@ -823,4 +825,143 @@ function UsersManager() {
       </div>
     </div>
   );
+}
+
+/* ==================== 知识库管理 ==================== */
+
+const KB_ACCEPT = ".docx,.doc,.xlsx,.xls,.csv,.pdf,.txt,.md";
+
+function KbManager() {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/kb", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "加载失败");
+      setDocs(Array.isArray(data) ? data : []);
+      setErr("");
+    } catch (e: any) {
+      setErr(e.message || "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function upload(file: File) {
+    setBusy(true);
+    setMsg("");
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/kb", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "导入失败");
+      setMsg(`《${file.name}》导入成功，提取 ${data.chars} 字，客服已可引用`);
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "导入失败");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function remove(id: string, title: string) {
+    if (!confirm(`确定删除《${title}》？客服将不再引用该文档。`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/kb?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "删除失败");
+      setMsg(`已删除《${title}》`);
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "删除失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="glass p-6">
+        <h2 className="text-sm font-semibold text-white">导入知识库文档</h2>
+        <p className="mt-1 text-xs leading-relaxed text-slate-400">
+          支持 Word（.docx/.doc）、Excel（.xlsx/.xls/.csv）、PDF（文字版）、TXT、Markdown，单个 ≤ 10MB。
+          导入后智能客服会依据文档内容回答访客提问（答案标注来源文档）。
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept={KB_ACCEPT}
+          disabled={busy}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) upload(f);
+          }}
+          className="mt-4 block w-full cursor-pointer rounded-lg border border-white/15 bg-slate-900/80 px-3 py-2.5 text-sm text-slate-300 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand-blue/80 file:px-3 file:py-1.5 file:text-white hover:border-brand-cyan/50"
+        />
+        {busy && <p className="mt-3 text-xs text-brand-cyan">正在解析文档…（大文件可能需要十几秒）</p>}
+        {msg && <p className="mt-3 text-xs text-emerald-400">{msg}</p>}
+        {err && <p className="mt-3 text-xs text-red-400">{err}</p>}
+      </div>
+
+      <div className="glass p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">已导入文档（{docs.length}）</h2>
+          <button onClick={load} className="text-xs text-slate-400 hover:text-white">刷新</button>
+        </div>
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-500">加载中…</p>
+        ) : docs.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">还没有导入文档。上传第一份产品手册或 FAQ，客服立刻变得更专业。</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-white/5">
+            {docs.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{iconForExt(d.ext)}</span>
+                    <span className="truncate text-sm font-medium text-slate-200">{d.title}</span>
+                    <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-xs uppercase text-slate-400">
+                      {d.ext}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-slate-500">
+                    {d.chars} 字 · 导入于 {d.at} · 摘要：{d.summary}
+                  </p>
+                </div>
+                <button
+                  onClick={() => remove(d.id, d.title)}
+                  disabled={busy}
+                  className="shrink-0 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10 disabled:opacity-40"
+                >
+                  删除
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function iconForExt(ext: string): string {
+  const m: Record<string, string> = {
+    docx: "📝", doc: "📝", xlsx: "📊", xls: "📊", csv: "📊", pdf: "📕", txt: "📄", md: "📄",
+  };
+  return m[ext] || "📄";
 }
