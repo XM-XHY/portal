@@ -24,7 +24,16 @@ export class SupabaseRepo implements Repo {
   private seedChecked = false;
 
   constructor(url: string, key: string) {
-    this.sb = createClient(url, key, { auth: { persistSession: false } });
+    this.sb = createClient(url, key, {
+      auth: { persistSession: false },
+      // 关键：Next.js 14 默认对服务端 fetch 开启 Data Cache（force-cache），
+      // 会把 Supabase 的读请求结果缓存住，导致后台改完数据、前台仍读到旧值
+      // （表现为"保存失败"）。这里强制所有请求不走缓存。
+      global: {
+        fetch: (input: any, init: any) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
+    });
   }
 
   private async ensureSeed() {
