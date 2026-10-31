@@ -153,10 +153,17 @@ export class SupabaseRepo implements Repo {
 
   // ---------- 内容（资讯/产品/案例）----------
   async getContents(type?: ContentType): Promise<ContentItem[]> {
-    let q = this.sb.from("contents").select("*");
-    if (type) q = q.eq("type", type);
-    const { data } = await q.order("order", { ascending: true });
-    return (data || []).map(fromContentRow);
+    try {
+      let q = this.sb.from("contents").select("*");
+      if (type) q = q.eq("type", type);
+      const { data } = await q.order("order", { ascending: true });
+      const list = (data || []).map(fromContentRow);
+      // 表不存在或为空时退回内置种子，保证前台产品/案例/资讯区块不空白
+      return list.length ? list : defaultContents().filter((c) => !type || c.type === type);
+    } catch (e) {
+      console.error("[supabase] getContents 失败，降级种子数据:", (e as Error)?.message);
+      return defaultContents().filter((c) => !type || c.type === type);
+    }
   }
 
   async getContent(id: string): Promise<ContentItem | null> {
