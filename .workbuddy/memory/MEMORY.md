@@ -4,7 +4,8 @@
 - 线上地址：**https://www.cnxhy.top**（生产别名，国内可访问）｜备用 https://xm-tech-portal.vercel.app
 - Vercel：team `xhy6`（team_jDWNPvAhjbZQ5hEbFHbmSny1），项目 `xm-tech-portal`（prj_LQQvY8YKmkX9ufaVMIlXXc5rJ3za），**plan = hobby（免费）**
 - Supabase：项目 ref `umtqzvgqblleyjxohfwb`，6 张表已建，**service_role 授权已补齐**，持久化已验证通过
-- 生产环境变量（全部 encrypted）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`ADMIN_SESSION_SECRET`、`SEARCH_MKT`、`GLOBAL_CONFIG`
+- 生产环境变量（全部 encrypted）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`ADMIN_SESSION_SECRET`、
+  `SEARCH_MKT`、`GLOBAL_CONFIG`、**`TAVILY_API_KEY`（真实全网检索已启用）**
 - 后台账号 `admin`（超管）/ `market`（线索），口令见 `lib/data/defaults.ts` 与 `supabase/schema.sql` 的种子哈希
 
 ## 关键约束与坑（复用必读）
@@ -30,17 +31,23 @@
     （见 `lib/data/supabase-repo.ts` 构造函数）。同理，任何走 fetch 的外部读请求都要显式 no-store。
 11. 本地复现线上问题：写 `.env.local`（已被 .gitignore 排除）→ `npm run build` → `npm start`
     → 用脚本打接口。**后台进程必须用 `run_in_background`，否则随 Bash 命令结束被杀**（表现为 ECONNREFUSED）。
+12. **不要用 curl 在 Git Bash 里测含中文的接口**：中文会被按 GBK 编码，服务端收到 U+FFFD 乱码，
+    外部 API 报 `Query is invalid`，极易误判成密钥失效。改用 Node `fetch` + `encodeURIComponent`。
+    另注意 /api/search 限流：同 IP 3 秒 1 次，脚本需间隔 ≥3.5s。
 
 ## 常用命令
 ```bash
 node scripts/connect-supabase.mjs "<secret key>"        # 校验+写 Vercel env+部署+验证
 node scripts/connect-supabase.mjs "<key>" --env-only    # 只写 env，跳过权限校验
 node scripts/verify-db.mjs "<secret key>"               # 数据库持久化端到端自检
+node scripts/verify-tavily.mjs "<tvly key>" "查询词"     # 验证搜索 key + 预览真实结果
+node scripts/test-search-api.mjs                        # 打本地 /api/search（UTF-8 正确编码）
+VERCEL_TOKEN=... node scripts/set-vercel-env.mjs KEY=VALUE  # 写入/更新加密环境变量（自动删旧值）
 export VERCEL_ORG_ID=team_... VERCEL_PROJECT_ID=prj_... && npx vercel deploy --prod --yes --token <token>
 ```
 
 ## 目录要点
 - `lib/data/`：可插拔存储（types / json-repo / supabase-repo / index 按 env 选择）
-- `lib/search.ts`：Brave → Tavily → SerpAPI → Bing(已退役) → mock，自动降级
+- `lib/search.ts`：Brave → Tavily → SerpAPI → Bing(已退役) → mock，自动降级；已接入 Tavily 真实检索
 - `supabase/schema.sql`：建表+种子；`supabase/grant-service-role.sql`：授权（各需执行一次）
 - `DEPLOY.md`：部署与环境变量说明

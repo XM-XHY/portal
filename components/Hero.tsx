@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import SearchWidget from "./SearchWidget";
 import type { SiteInfo } from "@/lib/store";
+import { brandName } from "@/lib/brand";
 
 export default function Hero({ site }: { site: SiteInfo }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -122,7 +123,7 @@ export default function Hero({ site }: { site: SiteInfo }) {
             重塑企业增长引擎
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-slate-300 sm:text-lg">
-            ﻿{site.companyName}科技为企业提供大模型应用、智能获客与内容中台。输入任意关键词，即刻全网检索可信信息。
+            {brandName(site.companyName)}为企业提供大模型应用、智能获客与内容中台。输入任意关键词，即刻全网检索可信信息。
           </p>
           <div className="mt-10 flex justify-center">
             <SearchWidget />

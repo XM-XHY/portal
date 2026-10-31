@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContent, getContents } from "@/lib/store";
 import LeadForm from "@/components/LeadForm";
+import OpenChatButton from "@/components/OpenChatButton";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,9 @@ export default async function ProductDetail({ params }: { params: { id: string }
         </div>
 
         <aside className="space-y-6">
+          {(item.title.includes("客服") || /copilot/i.test(item.title)) && (
+            <OpenChatButton label="💬 在线体验 AI 客服" />
+          )}
           <LeadForm title="预约此方案演示" contextLabel={`预约演示：${item.title}`} compact />
           {others.length > 0 && (
             <div className="glass p-5">

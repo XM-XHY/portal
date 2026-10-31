@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SiteInfo } from "@/lib/store";
+import { brandName } from "@/lib/brand";
 
 export default function Footer({ site }: { site: SiteInfo }) {
   return (
@@ -10,7 +11,7 @@ export default function Footer({ site }: { site: SiteInfo }) {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-violet text-white">
               AI
             </span>
-            {site.companyName}科技
+            {brandName(site.companyName)}
           </div>
           <p className="mt-3 text-sm text-slate-400">{site.slogan}</p>
         </div>
@@ -41,7 +42,7 @@ export default function Footer({ site }: { site: SiteInfo }) {
         </div>
       </div>
       <div className="border-t border-white/10 py-5 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} {site.companyName}科技 版权所有 · {site.icp} · 仅作演示用途
+        © {new Date().getFullYear()} {brandName(site.companyName)} 版权所有 · {site.icp} · 仅作演示用途
       </div>
     </footer>
   );

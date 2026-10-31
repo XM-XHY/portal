@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSite } from "@/lib/store";
+import { brandName } from "@/lib/brand";
 import Stats from "@/components/Stats";
 import LeadForm from "@/components/LeadForm";
 
@@ -33,7 +34,7 @@ export default async function AboutPage() {
         <div className="relative mx-auto max-w-5xl px-4 py-20 text-center sm:px-6 sm:py-28">
           <span className="glass inline-flex items-center gap-2 px-4 py-1.5 text-sm text-brand-cyan">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-cyan" />
-            关于 {site.companyName}科技
+            关于 {brandName(site.companyName)}
           </span>
           <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             让每一家企业，<br className="hidden sm:block" />都能用上 <span className="text-gradient">可信的 AI</span>
@@ -86,7 +87,7 @@ export default async function AboutPage() {
       <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <div className="glass p-10">
           <h2 className="text-center text-3xl font-bold sm:text-4xl">
-            与 <span className="text-gradient">{site.companyName}科技</span> 聊聊增长
+            与 <span className="text-gradient">{brandName(site.companyName)}</span> 聊聊增长
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-slate-400">
             无论你是想试点一个 AI 场景，还是规划企业级智能化蓝图，我们都期待与你对话。

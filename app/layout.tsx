@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ChatWidget from "@/components/ChatWidget";
 import { getSite } from "@/lib/store";
+import { brandName } from "@/lib/brand";
 
 // 关键：企业信息与内容均由后台 CMS 动态维护（Navbar/Footer/各页面都要实时读取），
 // 因此强制动态渲染，避免 Vercel 把站点信息预渲染固化到构建产物中导致后台修改不生效。
@@ -10,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSite();
-  const name = `${site.companyName}科技`;
+  const name = brandName(site.companyName);
   return {
     metadataBase: new URL("https://example.com"),
     title: {
@@ -42,6 +44,7 @@ export default async function RootLayout({
         <Navbar site={site} />
         {children}
         <Footer site={site} />
+        <ChatWidget />
       </body>
     </html>
   );
