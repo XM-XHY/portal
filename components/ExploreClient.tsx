@@ -91,7 +91,16 @@ export default function ExploreClient() {
                 {new Date(data.fetchedAt).toLocaleString("zh-CN")}
               </span>
             </div>
-            {data.note && (
+            {data.provider === "mock" && (
+              <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+                <p className="font-medium">当前为演示示例数据，条目链接不可访问</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
+                  网站尚未配置真实检索密钥（Bing 检索服务已于 2025 年 8 月停止服务）。
+                  在部署平台配置 TAVILY_API_KEY 或 BRAVE_API_KEY 后，这里将返回真实全网结果，链接可直接打开。
+                </p>
+              </div>
+            )}
+            {data.note && data.provider !== "mock" && (
               <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
                 {data.note}
               </div>
@@ -123,21 +132,34 @@ export default function ExploreClient() {
             )}
 
             <ul className="mt-4 space-y-3">
-              {data.results.map((r, i) => (
-                <li key={i} className="glass glass-hover p-5">
-                  <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-lg font-medium text-brand-cyan hover:underline">
-                    {r.title}
-                  </a>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-300">{r.snippet}</p>
-                  <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
-                    <span className="rounded-full border border-white/10 px-2 py-0.5">{r.source}</span>
-                    {r.publishedAt && <span>📅 {r.publishedAt}</span>}
-                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="ml-auto text-brand-cyan hover:underline">
-                      查看原文 ↗
-                    </a>
-                  </div>
-                </li>
-              ))}
+              {data.results.map((r, i) => {
+                const mock = data.provider === "mock";
+                return (
+                  <li key={i} className="glass glass-hover p-5">
+                    {mock ? (
+                      <span className="text-lg font-medium text-slate-300">{r.title}</span>
+                    ) : (
+                      <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-lg font-medium text-brand-cyan hover:underline">
+                        {r.title}
+                      </a>
+                    )}
+                    <p className="mt-2 text-sm leading-relaxed text-slate-300">{r.snippet}</p>
+                    <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
+                      <span className="rounded-full border border-white/10 px-2 py-0.5">{r.source}</span>
+                      {r.publishedAt && <span>📅 {r.publishedAt}</span>}
+                      {mock ? (
+                        <span className="ml-auto rounded-full border border-amber-500/30 px-2 py-0.5 text-amber-300/80">
+                          示例条目 · 不可访问
+                        </span>
+                      ) : (
+                        <a href={r.url} target="_blank" rel="noopener noreferrer" className="ml-auto text-brand-cyan hover:underline">
+                          查看原文 ↗
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="mt-8 glass border-brand-violet/30 p-6 text-center">

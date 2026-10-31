@@ -24,6 +24,12 @@
 8. **Vercel Hobby 仅限非商业个人使用**，企业官网严格说需 Pro（$20/月/席）。免费档不会自动扣费，超量只暂停功能。
 9. 构建需 `CODEBUDDY_SAFE_DELETE_ENABLED=0 npm run build`（否则 .next/trace EPERM）。
    `.vercelignore` 必须写 `/data`（写 `data` 会把源码 `lib/data/` 一起排除，构建 Module not found）。
+10. **Next.js 14 的 fetch 默认走 Data Cache（force-cache）**（Next 15 才改为默认 no-store）。
+    Supabase 客户端若不加处理，读请求会被缓存 → 后台改完数据，GET 仍返回旧值，
+    **表现为"保存失败"，实际已写库**。修复：`createClient(url, key, { global: { fetch: (i, init) => fetch(i, {...init, cache:"no-store"}) } })`
+    （见 `lib/data/supabase-repo.ts` 构造函数）。同理，任何走 fetch 的外部读请求都要显式 no-store。
+11. 本地复现线上问题：写 `.env.local`（已被 .gitignore 排除）→ `npm run build` → `npm start`
+    → 用脚本打接口。**后台进程必须用 `run_in_background`，否则随 Bash 命令结束被杀**（表现为 ECONNREFUSED）。
 
 ## 常用命令
 ```bash
