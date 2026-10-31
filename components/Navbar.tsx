@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { SiteInfo } from "@/lib/store";
+import { brandName } from "@/lib/brand";
 
 const links = [
   { href: "/", label: "首页" },
@@ -40,8 +41,7 @@ export default function Navbar({ site }: { site: SiteInfo }) {
               AI
             </span>
             <span className="text-lg tracking-tight">
-              {site.companyName}
-              <span className="text-gradient">科技</span>
+              {brandName(site.companyName)}
             </span>
           </Link>
 
