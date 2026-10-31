@@ -23,11 +23,21 @@ export type Lead = {
   note?: string;
 };
 
-export type ContentType = "news" | "product" | "case" | "kb";
+/**
+ * 内容类型：
+ * - news 资讯 / product 产品 / solution 解决方案 / case 案例  → 前台展示内容
+ * - kb 客服知识库文档
+ * - pdoc 产品资料（挂在某个产品/解决方案下的文档，client 存所属条目 id）
+ */
+export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc";
 
 /**
- * 统一内容实体：资讯（news）、产品（product）、案例（case）共用。
+ * 统一内容实体：资讯（news）、产品（product）、解决方案（solution）、案例（case）共用。
  * 由后台 CMS 维护；前台按 type 渲染不同页面。
+ * 各类型对通用字段的复用约定：
+ * - product / solution：tag=分类，industry=适用场景，result=成效亮点，tags=核心能力
+ * - case：tag=分类，client=客户名称，industry=所属行业，result=成效指标
+ * - kb / pdoc：tag=文件扩展名，client=文件名/所属产品 id，result=字数，body=提取的全文
  */
 export type ContentItem = {
   id: string;
@@ -38,9 +48,9 @@ export type ContentItem = {
   body: string; // 详情正文（支持换行，前台按段落渲染）
   icon: string; // 产品卡片图标（emoji）
   tags: string[]; // 亮点 / 标签（逗号分隔输入，数组存储）
-  client: string; // 案例：客户名称
-  industry: string; // 案例：所属行业
-  result: string; // 案例：成效指标
+  client: string; // 案例：客户名称；pdoc：所属产品 id
+  industry: string; // 案例：所属行业；product/solution：适用场景；pdoc：关联的知识库文档 id
+  result: string; // 案例：成效指标；kb/pdoc：字数
   at: string; // 日期（ISO）
   order: number; // 排序
 };

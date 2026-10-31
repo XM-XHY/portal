@@ -8,7 +8,7 @@ import { brandName } from "@/lib/brand";
 
 const links = [
   { href: "/", label: "首页" },
-  { href: "/products", label: "产品方案" },
+  { href: "/products", label: "产品中心" },
   { href: "/cases", label: "客户案例" },
   { href: "/about", label: "关于我们" },
   { href: "/explore", label: "智能获客" },

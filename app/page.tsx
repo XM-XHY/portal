@@ -4,12 +4,13 @@ import FeatureCards from "@/components/FeatureCards";
 import Stats from "@/components/Stats";
 import ProductCard from "@/components/ProductCard";
 import { getSite, getContents } from "@/lib/store";
+import { getProductItems } from "@/lib/products";
 import { brandName } from "@/lib/brand";
 
 export default async function HomePage() {
   const [site, products, cases, news] = await Promise.all([
     getSite(),
-    getContents("product"),
+    getProductItems(), // 产品 + 解决方案，按后台排序
     getContents("case"),
     getContents("news"),
   ]);
@@ -31,7 +32,7 @@ export default async function HomePage() {
               从模型应用到获客转化，把人工智能真正落到业务增长上。
             </p>
           </div>
-          <Link href="/products" className="btn-ghost">查看全部产品 →</Link>
+          <Link href="/products" className="btn-ghost">进入产品中心 →</Link>
         </div>
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {products.slice(0, 4).map((p) => (

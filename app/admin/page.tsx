@@ -59,6 +59,7 @@ export default function AdminPage() {
   // 依据角色计算可见 Tab
   const allTabs: { key: string; label: string; perm: Permission }[] = [
     { key: "site", label: "站点设置", perm: "settings.manage" },
+    { key: "products", label: "产品中心", perm: "content.manage" },
     { key: "content", label: "内容管理", perm: "content.manage" },
     { key: "kb", label: "知识库", perm: "content.manage" },
     { key: "leads", label: "线索管理", perm: "leads.view" },
@@ -113,6 +114,7 @@ export default function AdminPage() {
 
         <div className="mt-6">
           {active === "site" && <SiteSettings />}
+          {active === "products" && <ProductCenterManager />}
           {active === "content" && <ContentManager />}
           {active === "kb" && <KbManager />}
           {active === "leads" && <LeadsManager role={me.role} />}
@@ -263,23 +265,549 @@ function SiteSettings() {
   );
 }
 
-/* ---------------- 内容管理（资讯 / 产品 / 案例，卡片化 + 类型筛选） ---------------- */
-const TYPE_TABS: { key: "" | "news" | "product" | "case"; label: string }[] = [
+/* ==================== 产品中心（产品 / 解决方案 · 资料导入 · 展示排序） ==================== */
+
+type PDocLite = {
+  id: string;
+  title: string;
+  ext: string;
+  chars: number;
+  at: string;
+  summary: string;
+};
+
+type PItem = {
+  id: string;
+  type: "product" | "solution";
+  title: string;
+  tag: string;
+  summary: string;
+  body: string;
+  icon: string;
+  tags: string[];
+  industry: string;
+  result: string;
+  at: string;
+  order: number;
+  docs: PDocLite[];
+};
+
+type PForm = {
+  id: string;
+  type: "product" | "solution";
+  title: string;
+  tag: string;
+  icon: string;
+  summary: string;
+  body: string;
+  tags: string;
+  industry: string;
+  result: string;
+};
+
+const EMPTY_PFORM: PForm = {
+  id: "",
+  type: "product",
+  title: "",
+  tag: "",
+  icon: "📦",
+  summary: "",
+  body: "",
+  tags: "",
+  industry: "",
+  result: "",
+};
+
+const PDOC_ACCEPT = ".docx,.doc,.xlsx,.xls,.csv,.pdf,.txt,.md";
+
+function ProductCenterManager() {
+  const [items, setItems] = useState<PItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [form, setForm] = useState<PForm>(EMPTY_PFORM);
+  const [activeId, setActiveId] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [alsoKb, setAlsoKb] = useState(true);
+  const [dragId, setDragId] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/products", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "加载失败");
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setErr("");
+    } catch (e: any) {
+      setErr(e.message || "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const active = useMemo(() => items.find((i) => i.id === activeId) || null, [items, activeId]);
+
+  function flash(text: string) {
+    setMsg(text);
+    setTimeout(() => setMsg(""), 4000);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      setErr("名称必填");
+      return;
+    }
+    setErr("");
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "保存失败");
+      const editing = !!form.id;
+      setForm(EMPTY_PFORM);
+      flash(editing ? "已保存修改 ✅" : "已新增，排在列表末尾 ✅");
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "保存失败");
+    }
+  }
+
+  async function remove(id: string, title: string) {
+    if (!confirm(`确定删除「${title}」？该产品下的资料文档会一并删除。`)) return;
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "删除失败");
+      if (activeId === id) setActiveId("");
+      flash("已删除");
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "删除失败");
+    }
+  }
+
+  /** 保存新的展示顺序（先本地更新，再落库；失败自动回滚并重新拉取） */
+  async function persistOrder(next: PItem[]) {
+    const prev = items;
+    setItems(next);
+    try {
+      const res = await fetch("/api/products/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: next.map((i) => i.id) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "排序保存失败");
+    } catch (e: any) {
+      setItems(prev);
+      setErr(e.message || "排序保存失败");
+    }
+  }
+
+  function moveBy(id: string, delta: number) {
+    const idx = items.findIndex((i) => i.id === id);
+    const target = idx + delta;
+    if (idx < 0 || target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    persistOrder(next);
+  }
+
+  function moveTo(fromId: string, toId: string) {
+    if (!fromId || fromId === toId) return;
+    const from = items.findIndex((i) => i.id === fromId);
+    const to = items.findIndex((i) => i.id === toId);
+    if (from < 0 || to < 0) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    persistOrder(next);
+    setDragId("");
+  }
+
+  async function upload(file: File) {
+    if (!activeId) return;
+    setUploading(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("productId", activeId);
+      fd.append("file", file);
+      fd.append("title", file.name);
+      if (alsoKb) fd.append("alsoKb", "1");
+      const res = await fetch("/api/products/doc", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "导入失败");
+      flash(
+        `《${file.name}》导入成功，提取 ${data.chars} 字${data.kb ? "，已同步客服知识库" : ""}`
+      );
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "导入失败");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function removeDoc(id: string, title: string) {
+    if (!confirm(`确定删除资料《${title}》？`)) return;
+    try {
+      const res = await fetch(`/api/products/doc?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "删除失败");
+      flash("资料已删除");
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "删除失败");
+    }
+  }
+
+  function editItem(i: PItem) {
+    setForm({
+      id: i.id,
+      type: i.type,
+      title: i.title,
+      tag: i.tag,
+      icon: i.icon || "📦",
+      summary: i.summary,
+      body: i.body || "",
+      tags: (i.tags || []).join("，"),
+      industry: i.industry || "",
+      result: i.result || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const set = (k: keyof PForm, v: string) => setForm({ ...form, [k]: v });
+
+  return (
+    <div className="space-y-6">
+      {/* 新增 / 编辑 */}
+      <div className="glass p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-white">
+            {form.id ? "编辑条目" : "新增产品或解决方案"}
+          </h3>
+          {form.id && (
+            <button
+              type="button"
+              onClick={() => setForm(EMPTY_PFORM)}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              取消编辑
+            </button>
+          )}
+        </div>
+        <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            {(["product", "solution"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => set("type", t)}
+                className={`rounded-full px-3 py-1 text-xs ${
+                  form.type === t ? "bg-white/20 text-white" : "bg-white/5 text-slate-300"
+                }`}
+              >
+                {t === "product" ? "产品" : "解决方案"}
+              </button>
+            ))}
+          </div>
+
+          <input
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
+            placeholder="名称（必填），如：智能客服 Copilot"
+            className="input-base sm:col-span-2"
+            required
+          />
+          <input
+            value={form.tag}
+            onChange={(e) => set("tag", e.target.value)}
+            placeholder="分类，如：智能客服 / 金融"
+            className="input-base"
+          />
+          <input
+            value={form.icon}
+            onChange={(e) => set("icon", e.target.value)}
+            placeholder="图标 Emoji，如 💬"
+            className="input-base"
+          />
+          <input
+            value={form.industry}
+            onChange={(e) => set("industry", e.target.value)}
+            placeholder="适用场景，如：金融/政务/医疗等强合规行业"
+            className="input-base sm:col-span-2"
+          />
+          <input
+            value={form.result}
+            onChange={(e) => set("result", e.target.value)}
+            placeholder="成效亮点，如：响应时长 -70%"
+            className="input-base sm:col-span-2"
+          />
+          <input
+            value={form.tags}
+            onChange={(e) => set("tags", e.target.value)}
+            placeholder="核心能力（逗号分隔，如：大模型，知识库RAG）"
+            className="input-base sm:col-span-2"
+          />
+          <textarea
+            value={form.summary}
+            onChange={(e) => set("summary", e.target.value)}
+            placeholder="摘要（卡片上展示的一句话）"
+            rows={2}
+            className="input-base resize-none sm:col-span-2"
+          />
+          <textarea
+            value={form.body}
+            onChange={(e) => set("body", e.target.value)}
+            placeholder="详情正文（详情页展示，支持换行分段）"
+            rows={4}
+            className="input-base resize-none sm:col-span-2"
+          />
+
+          <div className="sm:col-span-2">
+            <button type="submit" className="btn-primary">
+              {form.id ? "保存修改" : "新增"}
+            </button>
+          </div>
+        </form>
+        {msg && <p className="mt-3 text-xs text-emerald-400">{msg}</p>}
+        {err && <p className="mt-3 text-xs text-red-400">{err}</p>}
+      </div>
+
+      {/* 列表与排序 */}
+      <div className="glass p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-white">
+            展示顺序（{items.length} 项）
+          </h3>
+          <button onClick={load} className="text-xs text-slate-400 hover:text-white">
+            刷新
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          拖动左侧手柄或使用 ↑ ↓ 调整展示位置，顺序即时保存，前台「产品中心」按此顺序展示。
+        </p>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-500">加载中…</p>
+        ) : items.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">
+            还没有产品或解决方案。用上方表单添加第一个，例如「智能客服 Copilot」。
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {items.map((i, idx) => (
+              <li
+                key={i.id}
+                draggable
+                onDragStart={() => setDragId(i.id)}
+                onDragEnd={() => setDragId("")}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  moveTo(dragId, i.id);
+                }}
+                className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${
+                  activeId === i.id
+                    ? "border-brand-cyan/50 bg-brand-cyan/5"
+                    : "border-white/10"
+                } ${dragId === i.id ? "opacity-50" : ""}`}
+              >
+                <span className="cursor-grab select-none text-slate-500" title="按住拖动排序">
+                  ⠿
+                </span>
+                <span className="w-5 text-center text-xs text-slate-500">{idx + 1}</span>
+                <span className="text-xl">{i.icon || "📦"}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        i.type === "solution"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-brand-violet/20 text-brand-violet"
+                      }`}
+                    >
+                      {i.type === "solution" ? "解决方案" : "产品"}
+                    </span>
+                    <span className="truncate text-sm font-medium text-slate-100">{i.title}</span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    {i.tag || "未分类"}
+                    {i.result ? ` · ${i.result}` : ""} · 资料 {i.docs.length} 份
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-1">
+                  <button
+                    onClick={() => moveBy(i.id, -1)}
+                    disabled={idx === 0}
+                    title="上移"
+                    className="rounded-lg border border-white/15 px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveBy(i.id, 1)}
+                    disabled={idx === items.length - 1}
+                    title="下移"
+                    className="rounded-lg border border-white/15 px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => setActiveId(i.id)}
+                    className={`rounded-lg border px-2 py-1 text-xs ${
+                      activeId === i.id
+                        ? "border-brand-cyan/50 text-brand-cyan"
+                        : "border-white/15 hover:bg-white/10"
+                    }`}
+                  >
+                    资料
+                  </button>
+                  <button
+                    onClick={() => editItem(i)}
+                    className="rounded-lg border border-white/15 px-2 py-1 text-xs hover:bg-white/10"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    onClick={() => remove(i.id, i.title)}
+                    className="rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-500/10"
+                  >
+                    删除
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* 资料导入 */}
+      <div className="glass p-6">
+        <h3 className="text-lg font-semibold text-white">
+          产品资料管理{active ? `：${active.title}` : ""}
+        </h3>
+        {!active ? (
+          <p className="mt-3 text-sm text-slate-500">
+            在上方列表点击某个条目的「资料」按钮，即可为它导入文档。
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">
+              支持 Word（.docx/.doc）、Excel（.xlsx/.xls/.csv）、PDF（文字版）、TXT、Markdown，单个 ≤
+              10MB。导入后可在前台该产品详情页「在线阅读 / 下载文本版」。
+            </p>
+            <label className="mt-3 flex items-center gap-2 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={alsoKb}
+                onChange={(e) => setAlsoKb(e.target.checked)}
+                className="h-4 w-4 accent-brand-cyan"
+              />
+              同时纳入智能客服知识库（客服回答时可引用该资料）
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={PDOC_ACCEPT}
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) upload(f);
+              }}
+              className="mt-3 block w-full cursor-pointer rounded-lg border border-white/15 bg-slate-900/80 px-3 py-2.5 text-sm text-slate-300 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand-blue/80 file:px-3 file:py-1.5 file:text-white hover:border-brand-cyan/50 disabled:opacity-50"
+            />
+            {uploading && <p className="mt-3 text-xs text-brand-cyan">正在解析文档…</p>}
+
+            <div className="mt-4">
+              {active.docs.length === 0 ? (
+                <p className="text-sm text-slate-500">该产品还没有资料文档。</p>
+              ) : (
+                <ul className="divide-y divide-white/5">
+                  {active.docs.map((d) => (
+                    <li key={d.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{iconForExt(d.ext)}</span>
+                          <span className="truncate text-sm font-medium text-slate-200">
+                            {d.title}
+                          </span>
+                          <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-xs uppercase text-slate-400">
+                            {d.ext}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {d.chars} 字 · {d.at}
+                          {d.summary ? ` · 摘要：${d.summary}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <a
+                          href={`/api/products/doc/${d.id}?mode=view`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10"
+                        >
+                          预览
+                        </a>
+                        <button
+                          onClick={() => removeDoc(d.id, d.title)}
+                          className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 内容管理（资讯 / 产品 / 解决方案 / 案例，卡片化 + 类型筛选） ---------------- */
+const TYPE_TABS: { key: "" | "news" | "product" | "solution" | "case"; label: string }[] = [
   { key: "", label: "全部" },
   { key: "news", label: "资讯" },
   { key: "product", label: "产品" },
+  { key: "solution", label: "解决方案" },
   { key: "case", label: "案例" },
 ];
 const TYPE_BADGE: Record<string, string> = {
   news: "bg-brand-blue/20 text-brand-blue",
   product: "bg-brand-violet/20 text-brand-violet",
+  solution: "bg-emerald-500/20 text-emerald-300",
   case: "bg-brand-cyan/20 text-brand-cyan",
 };
-const TYPE_LABEL: Record<string, string> = { news: "资讯", product: "产品", case: "案例" };
+const TYPE_LABEL: Record<string, string> = {
+  news: "资讯",
+  product: "产品",
+  solution: "解决方案",
+  case: "案例",
+};
 
 type CForm = {
   id: string;
-  type: "news" | "product" | "case";
+  type: "news" | "product" | "solution" | "case";
   title: string;
   tag: string;
   summary: string;
@@ -295,7 +823,7 @@ type CForm = {
 
 function ContentManager() {
   const [list, setList] = useState<any[]>([]);
-  const [typeFilter, setTypeFilter] = useState<"" | "news" | "product" | "case">("");
+  const [typeFilter, setTypeFilter] = useState<"" | "news" | "product" | "solution" | "case">("");
   const [form, setForm] = useState<CForm>({
     id: "", type: "news", title: "", tag: "", summary: "", body: "", icon: "📄",
     tags: "", client: "", industry: "", result: "", at: "", order: "0",
@@ -362,7 +890,7 @@ function ContentManager() {
         </h3>
         <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2 flex flex-wrap gap-2">
-            {(["news", "product", "case"] as const).map((t) => (
+            {(["news", "product", "solution", "case"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -378,14 +906,19 @@ function ContentManager() {
           <input value={form.tag} onChange={(e) => set("tag", e.target.value)} placeholder="分类标签，如：智能客服 / 金融" className="input-base" />
           <input value={form.order} onChange={(e) => set("order", e.target.value)} placeholder="排序（数字越小越靠前）" className="input-base" inputMode="numeric" />
 
-          {form.type === "product" && (
+          {(form.type === "product" || form.type === "solution") && (
             <input value={form.icon} onChange={(e) => set("icon", e.target.value)} placeholder="图标 Emoji，如 💬" className="input-base" />
+          )}
+          {(form.type === "product" || form.type === "solution") && (
+            <input value={form.industry} onChange={(e) => set("industry", e.target.value)} placeholder="适用场景，如：金融/政务等强合规行业" className="input-base" />
+          )}
+          {(form.type === "product" || form.type === "solution" || form.type === "case") && (
+            <input value={form.result} onChange={(e) => set("result", e.target.value)} placeholder="成效指标，如：成本 -35%" className="input-base sm:col-span-2" />
           )}
           {form.type === "case" && (
             <>
               <input value={form.client} onChange={(e) => set("client", e.target.value)} placeholder="客户名称" className="input-base" />
               <input value={form.industry} onChange={(e) => set("industry", e.target.value)} placeholder="所属行业" className="input-base" />
-              <input value={form.result} onChange={(e) => set("result", e.target.value)} placeholder="成效指标，如：成本 -35%" className="input-base sm:col-span-2" />
             </>
           )}
 

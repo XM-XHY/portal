@@ -1,16 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getContents } from "@/lib/store";
-import ProductsExplorer from "@/components/ProductsExplorer";
+import {
+  getProductItems,
+  getProductDocs,
+  countDocsByProduct,
+} from "@/lib/products";
+import ProductCenter from "@/components/ProductCenter";
 import LeadForm from "@/components/LeadForm";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
-  title: "产品与解决方案",
-  description: "XX 科技 AI 产品矩阵：智能客服、企业知识中枢、智能获客中台与数据洞察看板，覆盖企业增长全链路。",
+  title: "产品中心",
+  description:
+    "产品中心：标准化 AI 产品与成熟解决方案，提供产品资料与方案文档下载，可按业务场景选择并预约演示。",
 };
 
 export default async function ProductsPage() {
-  const products = await getContents("product");
+  const [items, docs] = await Promise.all([getProductItems(), getProductDocs()]);
+  const docCount = countDocsByProduct(docs);
+
+  const products = items.filter((i) => i.type === "product").length;
+  const solutions = items.filter((i) => i.type === "solution").length;
 
   return (
     <main className="min-h-screen">
@@ -20,14 +31,28 @@ export default async function ProductsPage() {
           <div className="max-w-3xl">
             <span className="glass inline-flex items-center gap-2 px-4 py-1.5 text-sm text-brand-cyan">
               <span className="h-2 w-2 animate-pulse rounded-full bg-brand-cyan" />
-              产品与解决方案
+              产品中心
             </span>
             <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-              一站式 <span className="text-gradient">AI 能力</span> 矩阵
+              成熟 <span className="text-gradient">产品</span> 与可落地的
+              <span className="text-gradient">解决方案</span>
             </h1>
             <p className="mt-5 max-w-2xl text-base text-slate-300 sm:text-lg">
-              从模型应用到获客转化，我们把人工智能真正落到业务增长上。选择适合你的方案，或预约一次专属演示。
+              标准化产品即开即用，解决方案按行业场景整合成熟交付路径。每个条目都配有产品资料与方案文档，可在线阅读或下载。
             </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-slate-400">
+              <span>
+                <b className="text-white">{products}</b> 个产品
+              </span>
+              <span>
+                <b className="text-white">{solutions}</b> 套解决方案
+              </span>
+              <span>
+                <b className="text-white">{docs.length}</b> 份资料文档
+              </span>
+            </div>
+
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="#demo" className="btn-primary">预约演示</Link>
               <Link href="/explore" className="btn-ghost">体验智能获客</Link>
@@ -37,13 +62,13 @@ export default async function ProductsPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <ProductsExplorer products={products} />
+        <ProductCenter items={items} docCount={docCount} />
       </section>
 
       <section id="demo" className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         <LeadForm
-          title="预约产品演示"
-          subtitle="留下联系方式，顾问将在 1 个工作日内与您联系，演示契合您业务场景的 AI 方案。"
+          title="获取产品资料与方案"
+          subtitle="留下联系方式，顾问将在 1 个工作日内与您联系，并发送契合您业务场景的产品资料包。"
         />
       </section>
     </main>
