@@ -35,3 +35,6 @@ next-env.d.ts
 
 # workbuddy 本地数据（含项目笔记与本地配置，不入库）
 .workbuddy/
+
+# CloudBase 部署工具会自动改写此文件并写入真实环境 ID，不入库
+cloudbaserc.json
