@@ -1,0 +1,23 @@
+# CloudBase 部署上传时排除的目录。
+# 实测：node_modules 已被正确排除（9861 个文件），否则每次部署都要全量上传依赖，
+# 而云端 Dockerfile 内本身就会执行 npm install。
+# .next 曾未被排除（本地构建残留，云端会重新构建），故下面用多种写法加固。
+
+node_modules/
+node_modules
+.next/
+.next
+.next/cache/
+**/.next/
+.git/
+.gitignore
+data/
+*.log
+.vercel
+.workbuddy
+preview/
+tsconfig.tsbuildinfo
+.env.local
+.env*.local
+DEPLOY.md
+DEPLOY-CLOUDBASE.md
