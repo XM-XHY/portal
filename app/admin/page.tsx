@@ -9,6 +9,7 @@ import {
   type Role,
   type Permission,
 } from "@/lib/auth";
+import ScheduleManager from "@/components/ScheduleManager";
 
 type Me = { username: string; role: Role } | null;
 
@@ -60,6 +61,7 @@ export default function AdminPage() {
   const allTabs: { key: string; label: string; perm: Permission }[] = [
     { key: "site", label: "站点设置", perm: "settings.manage" },
     { key: "products", label: "产品中心", perm: "content.manage" },
+    { key: "schedule", label: "排课系统", perm: "schedule.manage" },
     { key: "content", label: "内容管理", perm: "content.manage" },
     { key: "kb", label: "知识库", perm: "content.manage" },
     { key: "leads", label: "线索管理", perm: "leads.view" },
@@ -115,6 +117,7 @@ export default function AdminPage() {
         <div className="mt-6">
           {active === "site" && <SiteSettings />}
           {active === "products" && <ProductCenterManager />}
+          {active === "schedule" && <ScheduleManager />}
           {active === "content" && <ContentManager />}
           {active === "kb" && <KbManager />}
           {active === "leads" && <LeadsManager role={me.role} />}

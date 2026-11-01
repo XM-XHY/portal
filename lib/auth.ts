@@ -10,7 +10,8 @@ export type Permission =
   | "search.logs" // 搜索/获客日志查看
   | "users.manage" // 用户与角色管理
   | "settings.manage" // 系统设置/API 配置
-  | "audit.view"; // 操作审计日志查看
+  | "audit.view" // 操作审计日志查看
+  | "schedule.manage"; // 排课系统管理
 
 export const ROLE_LABELS: Record<Role, string> = {
   super: "超级管理员",
@@ -28,6 +29,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "users.manage": "用户与角色",
   "settings.manage": "系统设置",
   "audit.view": "操作审计",
+  "schedule.manage": "排课管理",
 };
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -39,8 +41,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "users.manage",
     "settings.manage",
     "audit.view",
+    "schedule.manage",
   ],
-  editor: ["content.manage"],
+  editor: ["content.manage", "schedule.manage"],
   lead: ["leads.view", "leads.export", "search.logs"],
   viewer: ["search.logs", "audit.view"],
   // 员工：无后台管理权限，仅可登录 /hub 使用企业知识中枢

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智排 · 学校排课系统 — 预览模板</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --brand:#4f46e5; --brand2:#0ea5e9; --line:#e5e7eb; --ok:#16a34a; --warn:#f59e0b; --bad:#dc2626;
+    --soft:#eef2ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+  .wrap{max-width:1160px;margin:0 auto;padding:24px 20px 80px}
+  header.top{background:linear-gradient(120deg,#4f46e5,#0ea5e9);color:#fff;border-radius:18px;padding:28px 32px;margin-bottom:22px;box-shadow:0 10px 30px rgba(79,70,229,.18)}
+  header.top h1{font-size:26px;letter-spacing:.5px}
+  header.top p{opacity:.92;margin-top:6px;font-size:14px}
+  .badge{display:inline-block;background:rgba(255,255,255,.2);padding:3px 12px;border-radius:999px;font-size:12px;margin-top:12px}
+  .steps{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 28px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .step b{color:var(--brand);background:var(--soft);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px}
+  .step.active{border-color:var(--brand);color:var(--ink);box-shadow:0 4px 14px rgba(79,70,229,.12)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:20px}
+  section h2{font-size:18px;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+  section h2 .n{background:var(--brand);color:#fff;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px}
+  section .desc{color:var(--muted);font-size:13px;margin-bottom:16px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+  th{background:var(--soft);color:var(--brand);font-weight:600}
+  tr:nth-child(even) td{background:#fafbff}
+  .tmpl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .tmpl{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fcfcff}
+  .tmpl h3{font-size:14px;margin-bottom:8px;color:var(--ink)}
+  .tmpl .dl{display:inline-block;margin-top:10px;background:var(--brand);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;text-decoration:none}
+  .tmpl .note{font-size:11px;color:var(--muted);margin-top:6px}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
+  .switch{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+  .switch label{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .seg button{border:0;background:#fff;padding:8px 18px;font-size:13px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--brand);color:#fff}
+  .grid-table{font-size:12px}
+  .grid-table th{background:#1f2937;color:#fff}
+  .grid-table td .sub{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+  .cell-pe{background:#e0f2fe}.cell-lab{background:#fef3c7}.cell-sport{background:#dcfce7}.cell-free{color:#cbd5e1}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .export-box{display:flex;gap:12px;flex-wrap:wrap}
+  .export-box a{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 22px;text-decoration:none;color:var(--ink);min-width:120px;transition:.2s}
+  .export-box a:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(79,70,229,.15)}
+  .export-box .ic{font-size:24px}
+  .export-box .t{font-size:13px;font-weight:600}
+  .export-box .s{font-size:11px;color:var(--muted)}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--soft);color:var(--brand);margin-left:6px}
+  .tip{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-top:12px}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>🎓 智排 · 学校排课系统</h1>
+    <p>导入名册 + 旧课表 → 配置规则 → 一键智能排课 → 三视图校核 → 导出下载</p>
+    <span class="badge">📋 预览模板 v0.1（校稿版 · 尚未开发）</span>
+  </header>
+
+  <div class="steps">
+    <div class="step active"><b>1</b>导入教师/班级/科目/教室名册</div>
+    <div class="step"><b>2</b>导入旧课表（材料，可选）</div>
+    <div class="step"><b>3</b>配置排课规则</div>
+    <div class="step"><b>4</b>一键智能排课</div>
+    <div class="step"><b>5</b>班级/教师/教室 校核</div>
+    <div class="step"><b>6</b>导出下载</div>
+  </div>
+
+  <!-- 1. 导入模板 -->
+  <section>
+    <h2><span class="n">1</span>数据导入 — 提供标准模板</h2>
+    <div class="desc">系统内置 4 类名册导入模板，用户下载后按格式填好再上传（支持 .xlsx / .csv）。模板含表头说明与示例行。</div>
+    <div class="tmpl-grid">
+      <div class="tmpl">
+        <h3>👩‍🏫 教师名册 <span class="tag">teachers</span></h3>
+        <table>
+          <tr><th>教师工号</th><th>姓名</th><th>可授科目</th><th>周最大课时</th><th>不排课节次</th></tr>
+          <tr><td>T01</td><td>张伟</td><td>数学</td><td>16</td><td>（可选）</td></tr>
+          <tr><td>T02</td><td>李娜</td><td>语文,历史</td><td>14</td><td>周一1,2</td></tr>
+        </table>
+        <a class="dl" href="#">⬇ 下载模板</a>
+        <div class="note">可授科目用逗号分隔；不排课节次格式：星期+节次，如「周一1,2」</div>
+      </div>
+      <div class="tmpl">
+        <h3>🏫 班级名册 <span class="tag">classes</span></h3>
+        <table>
+          <tr><th>班级ID</th><th>班级名称</th><th>学生人数</th></tr>
+          <tr><td>C01</td><td>高一(1)班</td><td>48</td></tr>
+          <tr><td>C02</td><td>高一(2)班</td><td>50</td></tr>
+        </table>
+        <a class="dl" href="#">⬇ 下载模板</a>
+        <div class="note">班级ID 将作为课表主键，需唯一</div>
+      </div>
+      <div class="tmpl">
+        <h3>📚 科目课时 <span class="tag">subject_hours</span></h3>
+        <table>
+          <tr><th>班级ID</th><th>科目</th><th>每周课时</th><th>需实验室</th></tr>
+          <tr><td>C01</td><td>数学</td><td>6</td><td>否</td></tr>
+          <tr><td>C01</td><td>物理</td><td>4</td><td>是</td></tr>
+        </table>
+        <a class="dl" href="#">⬇ 下载模板</a>
+        <div class="note">「需实验室」科目自动匹配实验室教室</div>
+      </div>
+      <div class="tmpl">
+        <h3>🚪 教室名册 <span class="tag">rooms</span></h3>
+        <table>
+          <tr><th>教室ID</th><th>教室名称</th><th>容量</th><th>类型</th></tr>
+          <tr><td>R01</td><td>101教室</td><td>55</td><td>普通</td></tr>
+          <tr><td>L01</td><td>物理实验室</td><td>40</td><td>实验室</td></tr>
+        </table>
+        <a class="dl" href="#">⬇ 下载模板</a>
+        <div class="note">类型：普通 / 实验室，用于科目匹配</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 旧课表 -->
+  <section>
+    <h2><span class="n">2</span>导入旧课表（作为排课材料）</h2>
+    <div class="desc">上传上一学期/上一版本的课表，系统将其作为「参考材料」：可选择「最小变动」策略，尽量保留原排法，只解决冲突与课时缺口。</div>
+    <table>
+      <tr><th>班级ID</th><th>星期</th><th>节次</th><th>科目</th><th>教师工号</th><th>教室ID</th></tr>
+      <tr><td>C01</td><td>周一</td><td>1</td><td>数学</td><td>T01</td><td>R01</td></tr>
+      <tr><td>C01</td><td>周一</td><td>2</td><td>语文</td><td>T02</td><td>R01</td></tr>
+      <tr><td>C01</td><td>周二</td><td>3</td><td>物理</td><td>T05</td><td>L01</td></tr>
+    </table>
+    <a class="dl" href="#" style="background:#0ea5e9">⬇ 下载旧课表模板</a>
+    <div class="tip">💡 不导入旧课表也能正常排课（纯按规则生成）；导入后可选「继承原排法 / 完全重排」两种策略。</div>
+  </section>
+
+  <!-- 3. 规则 -->
+  <section>
+    <h2><span class="n">3</span>排课规则配置</h2>
+    <div class="desc">设置时间结构与约束，决定排课引擎的行为。</div>
+    <div class="form-grid">
+      <div><label>每周上课天数</label><select><option>5 天（周一~周五）</option><option>6 天</option><option>7 天</option></select></div>
+      <div><label>每天节次</label><select><option>8 节</option><option>10 节</option><option>12 节</option></select></div>
+      <div><label>上午节次</label><input value="1-4 节  08:00–11:40" /></div>
+      <div><label>下午节次</label><input value="5-8 节  14:00–17:40" /></div>
+      <div><label>连堂课默认</label><select><option>允许 2 节连排</option><option>禁止连排</option><option>仅实验课连排</option></select></div>
+      <div><label>体育课分散</label><select><option>每周不连天</option><option>不限制</option></select></div>
+    </div>
+    <div class="switch">
+      <label><input type="checkbox" checked /> 优先继承旧课表（最小变动）</label>
+      <label><input type="checkbox" checked /> 同一教师全天不跨校区冲突</label>
+      <label><input type="checkbox" /> 主科集中在上午</label>
+      <label><input type="checkbox" checked /> 冲突自动检测并标红</label>
+    </div>
+  </section>
+
+  <!-- 4&5. 课表预览 -->
+  <section>
+    <h2><span class="n">4</span>排课结果预览 — 三视图校核</h2>
+    <div class="desc">一键排课后生成课表，支持班级 / 教师 / 教室三种视角切换，冲突自动高亮，可手动拖拽微调。</div>
+    <div class="seg">
+      <button class="on">🏫 班级课表（高一(1)班）</button>
+      <button>👩‍🏫 教师课表（张伟）</button>
+      <button>🚪 教室课表（101教室）</button>
+    </div>
+    <table class="grid-table">
+      <tr><th>节次＼星期</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th></tr>
+      <tr><td>第1节</td><td class="cell-pe">数学<span class="sub">张伟·R01</span></td><td>语文<span class="sub">李娜·R01</span></td><td>英语<span class="sub">王芳·R02</span></td><td>数学<span class="sub">张伟·R01</span></td><td>体育<span class="sub">赵强·操场</span></td></tr>
+      <tr><td>第2节</td><td>数学<span class="sub">张伟·R01</span></td><td>语文<span class="sub">李娜·R01</span></td><td>物理<span class="sub">孙明·L01</span></td><td>英语<span class="sub">王芳·R02</span></td><td>历史<span class="sub">李娜·R01</span></td></tr>
+      <tr><td>第3节</td><td>英语<span class="sub">王芳·R02</span></td><td class="cell-lab">物理<span class="sub">孙明·L01</span></td><td>化学<span class="sub">周涛·L02</span></td><td>生物<span class="sub">吴敏·R03</span></td><td>地理<span class="sub">郑华·R01</span></td></tr>
+      <tr><td>第4节</td><td>政治<span class="sub">钱进·R01</span></td><td>数学<span class="sub">张伟·R01</span></td><td>英语<span class="sub">王芳·R02</span></td><td class="cell-sport">体育<span class="sub">赵强·操场</span></td><td>音乐<span class="sub">冯雪·R04</span></td></tr>
+      <tr><td>第5节</td><td class="cell-free">— 自习 —</td><td>生物<span class="sub">吴敏·R03</span></td><td>数学<span class="sub">张伟·R01</span></td><td>化学<span class="sub">周涛·L02</span></td><td class="cell-free">— 班会 —</td></tr>
+      <tr><td>第6节</td><td>历史<span class="sub">李娜·R01</span></td><td>地理<span class="sub">郑华·R01</span></td><td class="cell-free">— 活动 —</td><td>信息技术<span class="sub">陈亮·机房</span></td><td class="cell-free">— 自由 —</td></tr>
+      <tr><td>第7节</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td></tr>
+      <tr><td>第8节</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td><td class="cell-free">— 自由 —</td></tr>
+    </table>
+    <div class="legend">
+      <span><i style="background:#e0f2fe"></i>普通课</span>
+      <span><i style="background:#fef3c7"></i>实验课</span>
+      <span><i style="background:#dcfce7"></i>体育课</span>
+      <span><i style="background:#f1f5f9"></i>自习/空</span>
+      <span style="color:#dc2626">🔴 冲突单元格将标红</span>
+    </div>
+    <div class="tip">💡 三视图意义：班级视图看「某班每天上什么」；教师视图查「某老师是否撞课」；教室视图查「教室是否被重复占用」。三者联动，改一处三处同步。</div>
+  </section>
+
+  <!-- 6. 导出 -->
+  <section>
+    <h2><span class="n">5</span>导出与下载</h2>
+    <div class="desc">排课校核无误后，一键导出。系统生成下载链接（含全部班级 + 教师 + 教室课表）。</div>
+    <div class="export-box">
+      <a href="#"><span class="ic">📊</span><span class="t">Excel 课表</span><span class="s">.xlsx · 多 Sheet</span></a>
+      <a href="#"><span class="ic">📄</span><span class="t">PDF 课表</span><span class="s">.pdf · 可打印</span></a>
+      <a href="#"><span class="ic">🖨️</span><span class="t">打印预览</span><span class="s">浏览器直印</span></a>
+      <a href="#"><span class="ic">📋</span><span class="t">总览清单</span><span class="s">.csv · 扁平数据</span></a>
+    </div>
+    <div class="tip">💡 下载链接支持：① 单个班级/教师/教室单独导出；② 全校汇总包；③ 生成可分享的只读查看链接（无需登录即可看，不可改）。</div>
+  </section>
+
+  <footer>
+    本页为「学校排课系统」功能设计预览模板 · 仅供校稿确认 · 正式开发前数据均为示例<br/>
+    校稿确认后，将据此搭建可运行的网页版排课系统。
+  </footer>
+
+</div>
+</body>
+</html>
