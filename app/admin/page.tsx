@@ -1659,6 +1659,20 @@ function PayConfigManager() {
   const [busy, setBusy] = useState(false);
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [payStatus, setPayStatus] = useState<any>(null);
+  const [check, setCheck] = useState<any>(null);
+  const [checking, setChecking] = useState(false);
+
+  const runCheck = useCallback(async () => {
+    setChecking(true);
+    try {
+      const d = await fetch("/api/pay/selfcheck", { cache: "no-store" }).then((r) => r.json());
+      setCheck(d);
+    } catch (e: any) {
+      setCheck({ error: e.message || "自检失败" });
+    } finally {
+      setChecking(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1758,6 +1772,18 @@ function PayConfigManager() {
           <p className="mt-3 text-xs text-amber-400">
             提示：未配置真实通道时，前台下载会提示「支付通道未配置」。请到 Vercel 设置 <code className="rounded bg-black/30 px-1">PAY_PROVIDER=wechat|alipay</code> 并补全对应商户密钥后重新部署。
           </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button onClick={runCheck} disabled={checking} className="btn-ghost">
+            {checking ? "自检中…" : "🔍 运行支付自检"}
+          </button>
+          <span className="text-xs text-slate-500">验证商户号 / API 私钥 / 证书序列号是否可用（仅返回结论，不返回密钥内容）</span>
+        </div>
+        {check && (
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+            <pre className="whitespace-pre-wrap break-all text-xs text-slate-300">{JSON.stringify(check, null, 2)}</pre>
+          </div>
         )}
       </div>
 

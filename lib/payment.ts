@@ -136,6 +136,22 @@ class WechatPayProvider implements PaymentProvider {
     };
   }
 
+  /** 自检：调用微信「获取平台证书」接口，校验商户号/私钥/证书序列号是否可用 */
+  async certCheck(): Promise<{ ok: boolean; httpStatus?: number; detail: string }> {
+    const urlPath = "/v3/certificates";
+    try {
+      const res = await fetch(`${this.base}${urlPath}`, {
+        method: "GET",
+        headers: { Accept: "application/json", Authorization: this.authHeader("GET", urlPath, "") },
+      });
+      const text = await res.text();
+      if (!res.ok) return { ok: false, httpStatus: res.status, detail: text.slice(0, 400) };
+      return { ok: true, httpStatus: res.status, detail: "平台证书接口调通：商户号 / API 私钥 / 证书序列号校验通过 ✅" };
+    } catch (e: any) {
+      return { ok: false, detail: e.message || "请求微信接口失败" };
+    }
+  }
+
   successResponse() {
     return { contentType: "application/json", body: JSON.stringify({ code: "SUCCESS", message: "成功" }) };
   }
@@ -264,6 +280,44 @@ export function getPaymentProvider(): PaymentProvider | null {
     if (a.appId && a.privateKey && a.alipayPublicKey) return a;
   } catch {}
   return null;
+}
+
+/**
+ * 支付配置自检：返回缺失的配置项名称（不返回任何密钥内容）+ 微信接口连通性测试结果。
+ * 便于管理员自行排查凭据是否配置正确。
+ */
+export async function selfCheck(): Promise<{
+  provider: OrderProvider | null;
+  missing: string[];
+  apiTest?: { ok: boolean; httpStatus?: number; detail: string };
+  notifyBase?: string;
+}> {
+  const st = paymentStatus();
+  const mode = (process.env.PAY_PROVIDER || "").toLowerCase();
+  const missing: string[] = [];
+  const wantWechat = mode === "wechat" || (!mode && st.wechat);
+  const wantAlipay = mode === "alipay" || (!mode && st.alipay);
+  if (wantWechat)
+    for (const k of ["WECHAT_PAY_MCH_ID", "WECHAT_PAY_APP_ID", "WECHAT_PAY_API_V3_KEY", "WECHAT_PAY_SERIAL", "WECHAT_PAY_PRIVATE_KEY", "WECHAT_PAY_CERT"])
+      if (!process.env[k]) missing.push(k);
+  if (wantAlipay)
+    for (const k of ["ALIPAY_APP_ID", "ALIPAY_PRIVATE_KEY", "ALIPAY_PUBLIC_KEY"])
+      if (!process.env[k]) missing.push(k);
+
+  let apiTest: { ok: boolean; httpStatus?: number; detail: string } | undefined;
+  if (st.provider === "wechat" && missing.length === 0) {
+    try {
+      apiTest = await new WechatPayProvider().certCheck();
+    } catch (e: any) {
+      apiTest = { ok: false, detail: e.message || "初始化失败" };
+    }
+  }
+  return {
+    provider: st.provider,
+    missing,
+    apiTest,
+    notifyBase: process.env.PAY_NOTIFY_BASE || "(未设置，按请求 origin 推导)",
+  };
 }
 
 /** 返回已配置通道的概览（不含密钥），供后台展示状态 */
