@@ -3,6 +3,7 @@ import { getContents, getSite, appendAudit } from "@/lib/store";
 import { getAdminFromCookie, clientIp } from "@/lib/session";
 import { searchKnowledge } from "@/lib/kb";
 import { buildMaterialPrompt, fallbackMaterial } from "@/lib/hub";
+import { llmChat } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,48 +15,6 @@ function rateLimited(ip: string): boolean {
   if (now - last < 4000) return true;
   (globalThis as any).__lastHubGen = { ...((globalThis as any).__lastHubGen || {}), [ip]: now };
   return false;
-}
-
-/** 调用 OpenAI 兼容大模型生成材料；未配置密钥或失败返回 null */
-async function llmGenerate(
-  system: string,
-  question: string
-): Promise<string | null> {
-  const key = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY;
-  if (!key) return null;
-  const base = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.LLM_MODEL || "gpt-4o-mini";
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 50000);
-  try {
-    const res = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: question },
-        ],
-        temperature: 0.4,
-        max_tokens: 1600,
-      }),
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /** 从材料正文里取标题：优先第一个 # 标题，否则取需求前 40 字 */
@@ -88,10 +47,14 @@ export async function POST(req: NextRequest) {
   const hits = kbDocs.length ? searchKnowledge(kbDocs, question, 5) : [];
   const sources = Array.from(new Set(hits.map((h) => h.doc.title)));
 
-  const llm = await llmGenerate(
-    buildMaterialPrompt(site.companyName, question, hits),
-    question
-  );
+  // 国产大模型优先（见 lib/llm.ts）；未配置或失败时回落到知识库原文整理
+  const llm = await llmChat({
+    system: buildMaterialPrompt(site.companyName, question, hits),
+    messages: [{ role: "user", content: question }],
+    temperature: 0.4,
+    maxTokens: 1600,
+    timeoutMs: 50000,
+  });
 
   const content =
     llm ?? fallbackMaterial(question, hits, site.companyName).content;

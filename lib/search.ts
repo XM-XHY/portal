@@ -1,3 +1,5 @@
+import { llmChat } from "./llm";
+
 export type SearchResult = {
   title: string;
   url: string;
@@ -10,14 +12,26 @@ export type SearchSource = { n: number; title: string; url: string };
 
 /**
  * 检索供应商。
+ *
+ * 国内部署优先用 bocha（博查，国内节点、响应约 0.15s、中文结果质量好）。
+ * 海外源（brave/tavily/serpapi）在国内服务器上通常直连不通，仅作可选降级。
+ *
  * ⚠️ 注意：微软已于 2025-08-11 全面退役 Bing Search API（v7），
  * 新用户无法注册，旧密钥返回 410 Gone。故 bing 仅作历史兼容保留，不推荐使用。
- * 推荐顺序：Brave（每月 $5 免费额度）→ Tavily → SerpAPI。
+ *
+ * 推荐顺序：博查(BOCHA_API_KEY) → Brave → Tavily → SerpAPI。
  */
-export type SearchProvider = "brave" | "tavily" | "serpapi" | "bing" | "mock";
+export type SearchProvider =
+  | "bocha"
+  | "brave"
+  | "tavily"
+  | "serpapi"
+  | "bing"
+  | "mock";
 
 /** 供应商中文名，用于前端展示 */
 export const PROVIDER_LABEL: Record<SearchProvider, string> = {
+  bocha: "博查全网检索",
   brave: "Brave 全网检索",
   tavily: "Tavily AI 检索",
   serpapi: "SerpAPI 全网检索",
@@ -60,10 +74,64 @@ async function fetchWithTimeout(
 }
 
 /**
- * Brave Search API（推荐）。
+ * 博查搜索 Web Search API（国内部署首选）。
+ *
+ * 国内节点、中文检索质量好、官方称响应约 0.15s，Response 兼容 Bing Search API 格式。
+ * 端点：POST https://api.bochaai.com/v1/web-search
+ * 鉴权：Authorization: Bearer <API-KEY>
+ * 申请：https://open.bochaai.com （也可用阿里云市场购买）
+ *
+ * 环境变量：BOCHA_API_KEY（必填）；BOCHA_ENDPOINT 可覆盖端点（厂商变更地址时用）。
+ */
+async function bochaSearch(query: string): Promise<SearchResult[]> {
+  const key = process.env.BOCHA_API_KEY!;
+  const endpoint =
+    process.env.BOCHA_ENDPOINT?.trim() || "https://api.bochaai.com/v1/web-search";
+
+  const res = await fetchWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query,
+        count: 10,
+        // true 时每条结果附一份网页正文摘要，利于生成带引用的综述
+        summary: true,
+        // 可选：noLimit | day | week | month | year
+        freshness: process.env.BOCHA_FRESHNESS?.trim() || "noLimit",
+      }),
+      cache: "no-store",
+    },
+    8000
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Bocha ${res.status} ${detail.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  // 兼容两种返回结构：{ data: { webPages: { value } } } 与 { webPages: { value } }
+  const pages = data?.data?.webPages?.value ?? data?.webPages?.value ?? [];
+  return (pages as any[]).map((it: any) => ({
+    title: it.name || it.title || "",
+    url: it.url || "",
+    snippet: it.snippet || it.summary || "",
+    source: it.siteName || hostOf(it.url || ""),
+    publishedAt: it.datePublished
+      ? String(it.datePublished).slice(0, 10)
+      : undefined,
+  }));
+}
+
+/**
+ * Brave Search API（海外源）。
  * 自建独立索引，返回结构化结果，非抓取 Google/Bing，合规风险低。
  * 定价：$5/1000 次，每月赠送 $5 额度（≈1000 次/月免费）。
  * 申请：https://brave.com/search/api/
+ * ⚠️ 国内服务器直连通常不通，仅作降级。
  */
 async function braveSearch(query: string): Promise<SearchResult[]> {
   const key = process.env.BRAVE_API_KEY!;
@@ -195,17 +263,15 @@ async function serpSearch(query: string): Promise<SearchResult[]> {
 }
 
 /**
- * 可选：调用 OpenAI 兼容大模型，基于真实检索结果生成"带引用的摘要"。
- * 仅当配置了 LLM_API_KEY 且为真实检索结果时调用。失败/超时返回 null（不影响结果展示）。
+ * 可选：调用大模型，基于真实检索结果生成"带引用的摘要"。
+ * 走 lib/llm.ts（国产模型优先），配置了任一厂商密钥即生效。
+ * 失败/超时返回 null（不影响结果展示）。
  */
 async function llmSummarize(
   query: string,
   results: SearchResult[]
 ): Promise<{ summary?: string; sources?: SearchSource[] } | null> {
-  const key = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY;
-  if (!key || results.length === 0) return null;
-  const base = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.LLM_MODEL || "gpt-4o-mini";
+  if (results.length === 0) return null;
 
   const ctx = results
     .slice(0, 6)
@@ -223,29 +289,14 @@ async function llmSummarize(
   const user = `关键词：${query}\n\n检索结果：\n${ctx}`;
 
   try {
-    const res = await fetchWithTimeout(
-      `${base}/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: user },
-          ],
-          temperature: 0.2,
-          max_tokens: 400,
-        }),
-      },
-      9000
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = (data.choices?.[0]?.message?.content || "").trim();
+    const text =
+      (await llmChat({
+        system: sys,
+        messages: [{ role: "user", content: user }],
+        temperature: 0.2,
+        maxTokens: 400,
+        timeoutMs: 9000,
+      })) || "";
     const m = text.match(/\{[\s\S]*"refs"[\s\S]*\}/);
     let refs: number[] = [];
     let summary = text;
@@ -303,8 +354,9 @@ function mockResults(query: string): SearchResult[] {
  * 全网检索主入口。
  *
  * 供应商优先级（配置了哪个就用哪个，失败自动降级到下一个）：
- *   Brave(BRAVE_API_KEY) → Tavily(TAVILY_API_KEY) → SerpAPI(SERPAPI_KEY) → Bing(BING_API_KEY，已退役) → 示例数据
- * 也可用 SEARCH_PROVIDER=brave|tavily|serpapi|bing 强制指定。
+ *   博查(BOCHA_API_KEY，国内首选) → Brave(BRAVE_API_KEY) → Tavily(TAVILY_API_KEY)
+ *   → SerpAPI(SERPAPI_KEY) → Bing(BING_API_KEY，已退役) → 示例数据
+ * 也可用 SEARCH_PROVIDER=bocha|brave|tavily|serpapi|bing 强制指定。
  *
  * 真实检索且配置了 LLM_API_KEY 时，附加"带引用来源的摘要"；
  * Tavily 自带 answer，未配 LLM 时也会直接展示。
@@ -321,6 +373,12 @@ export async function searchWeb(query: string): Promise<SearchResponse> {
   };
 
   const attempts: Attempt[] = [
+    {
+      // 国内部署首选：博查（国内节点）。配置 BOCHA_API_KEY 即启用。
+      id: "bocha",
+      ready: !!process.env.BOCHA_API_KEY,
+      run: async () => ({ results: await bochaSearch(q) }),
+    },
     {
       id: "brave",
       ready: !!process.env.BRAVE_API_KEY,
@@ -385,6 +443,6 @@ export async function searchWeb(query: string): Promise<SearchResponse> {
     provider: "mock",
     note: configured
       ? `真实检索失败（${failures.join("；")}），已展示示例数据。`
-      : "未配置 BRAVE_API_KEY / TAVILY_API_KEY / SERPAPI_KEY，当前为示例数据；配置后即为真实全网检索。",
+      : "未配置 BOCHA_API_KEY / BRAVE_API_KEY / TAVILY_API_KEY / SERPAPI_KEY，当前为示例数据；配置后即为真实全网检索（国内部署推荐博查）。",
   };
 }

@@ -9,6 +9,7 @@ import {
   FALLBACK_REPLY,
 } from "@/lib/chat";
 import { searchKnowledge, formatHits } from "@/lib/kb";
+import { llmChat } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,45 +22,10 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-/** 可选：调用 OpenAI 兼容大模型生成回复。未配置密钥或失败返回 null。 */
-async function llmReply(
-  system: string,
-  history: ChatMessage[]
-): Promise<string | null> {
-  const key = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY;
-  if (!key) return null;
-  const base = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-  const model = process.env.LLM_MODEL || "gpt-4o-mini";
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
-  try {
-    const res = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: system }, ...history],
-        temperature: 0.5,
-        max_tokens: 500,
-      }),
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
+/**
+ * 大模型回复已统一到 lib/llm.ts（国产模型优先，OpenAI 兼容协议）。
+ * 未配置密钥或调用失败时返回 null，下面会依次降级到知识库直答、规则引擎。
+ */
 export async function POST(req: NextRequest) {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -110,7 +76,13 @@ export async function POST(req: NextRequest) {
   const kbText = kbHits.length ? formatHits(kbHits) : undefined;
 
   // 1) 优先真实 LLM（命中知识库时把文档片段一并注入）
-  const llm = await llmReply(buildSystemPrompt(knowledge, kbText), history);
+  const llm = await llmChat({
+    system: buildSystemPrompt(knowledge, kbText),
+    messages: history,
+    temperature: 0.5,
+    maxTokens: 500,
+    timeoutMs: 20000,
+  });
   if (llm) {
     return NextResponse.json(
       {
