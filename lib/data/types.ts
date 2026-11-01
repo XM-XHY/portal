@@ -30,8 +30,9 @@ export type Lead = {
  * - pdoc 产品资料（挂在某个产品/解决方案下的文档，client 存所属条目 id）
  * - sched 排课系统主数据（body 存完整状态 JSON，零 DDL）
  * - sched_share 排课只读分享快照（body 存 state JSON）
+ * - paycfg 产品付费配置（body 存收款二维码 + 各产品下载付费金额）
  */
-export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc" | "sched" | "sched_share";
+export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc" | "sched" | "sched_share" | "paycfg";
 
 /**
  * 统一内容实体：资讯（news）、产品（product）、解决方案（solution）、案例（case）共用。

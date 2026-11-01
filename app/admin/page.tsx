@@ -62,6 +62,7 @@ export default function AdminPage() {
     { key: "site", label: "站点设置", perm: "settings.manage" },
     { key: "products", label: "产品中心", perm: "content.manage" },
     { key: "schedule", label: "排课系统", perm: "schedule.manage" },
+    { key: "pay", label: "产品付费", perm: "settings.manage" },
     { key: "content", label: "内容管理", perm: "content.manage" },
     { key: "kb", label: "知识库", perm: "content.manage" },
     { key: "leads", label: "线索管理", perm: "leads.view" },
@@ -118,6 +119,7 @@ export default function AdminPage() {
           {active === "site" && <SiteSettings />}
           {active === "products" && <ProductCenterManager />}
           {active === "schedule" && <ScheduleManager />}
+          {active === "pay" && <PayConfigManager />}
           {active === "content" && <ContentManager />}
           {active === "kb" && <KbManager />}
           {active === "leads" && <LeadsManager role={me.role} />}
@@ -1638,6 +1640,203 @@ function KbManager() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ==================== 产品付费（收款二维码 + 各产品下载付费金额） ==================== */
+
+type PayItem = { paid: boolean; amount: number };
+type PayForm = { qrImageUrl: string; qrNote: string; items: Record<string, PayItem> };
+type Billable = { id: string; title: string; icon: string; type: string };
+
+function PayConfigManager() {
+  const [products, setProducts] = useState<Billable[]>([]);
+  const [form, setForm] = useState<PayForm>({ qrImageUrl: "", qrNote: "微信 / 支付宝 扫码支付", items: {} });
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [qrFile, setQrFile] = useState<File | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [p, c] = await Promise.all([
+        fetch("/api/products", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/payconfig", { cache: "no-store" }).then((r) => r.json()),
+      ]);
+      const items = (p.items || []) as Billable[];
+      const list: Billable[] = [
+        ...items,
+        { id: "sched", title: "智能排课系统", icon: "🗓️", type: "tool" },
+      ];
+      setProducts(list);
+      const saved = (c.items || {}) as Record<string, PayItem>;
+      const merged: Record<string, PayItem> = {};
+      for (const it of list) merged[it.id] = saved[it.id] || { paid: false, amount: 0 };
+      setForm({
+        qrImageUrl: c.qrImageUrl || "",
+        qrNote: c.qrNote || "微信 / 支付宝 扫码支付",
+        items: merged,
+      });
+      setErr("");
+    } catch (e: any) {
+      setErr(e.message || "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function onQrFile(file: File) {
+    setErr("");
+    if (file.size > 800 * 1024) {
+      setErr("二维码图片过大（建议 < 800KB）");
+      return;
+    }
+    const dataUrl = await new Promise<string>((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result as string);
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+    setForm((f) => ({ ...f, qrImageUrl: dataUrl }));
+  }
+
+  function setItem(id: string, patch: Partial<PayItem>) {
+    setForm((f) => ({
+      ...f,
+      items: { ...f.items, [id]: { ...f.items[id], ...patch } },
+    }));
+  }
+
+  async function save() {
+    setBusy(true);
+    setMsg("");
+    setErr("");
+    try {
+      const res = await fetch("/api/payconfig", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "保存失败");
+      setMsg("已保存，前台下载将按新规则弹出收款二维码 ✅");
+    } catch (e: any) {
+      setErr(e.message || "保存失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const set = (k: keyof PayForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <div className="space-y-6">
+      <div className="glass p-6">
+        <h3 className="text-lg font-semibold text-white">收款二维码</h3>
+        <p className="mt-1 text-sm text-slate-400">
+          用户在前台下载需付费的资源时，会展示此二维码。上传一张微信 / 支付宝收款码图片，或粘贴图片链接。
+        </p>
+        <div className="mt-4 flex flex-wrap items-start gap-4">
+          <div className="w-40 shrink-0">
+            {form.qrImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.qrImageUrl} alt="收款二维码" className="h-40 w-40 rounded-lg border border-white/10 bg-white object-contain p-2" />
+            ) : (
+              <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/5 text-xs text-slate-500">
+                尚未设置二维码
+              </div>
+            )}
+          </div>
+          <div className="flex-1 space-y-3">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onQrFile(f);
+              }}
+              className="block w-full cursor-pointer rounded-lg border border-white/15 bg-slate-900/80 px-3 py-2.5 text-sm text-slate-300 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand-blue/80 file:px-3 file:py-1.5 file:text-white"
+            />
+            <input
+              value={form.qrImageUrl}
+              onChange={(e) => set("qrImageUrl", e.target.value)}
+              placeholder="或粘贴二维码图片链接（https://…）"
+              className="input-base"
+            />
+            <input
+              value={form.qrNote}
+              onChange={(e) => set("qrNote", e.target.value)}
+              placeholder="二维码说明，如：微信 / 支付宝 扫码支付"
+              className="input-base"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="glass p-6">
+        <h3 className="text-lg font-semibold text-white">各产品下载付费</h3>
+        <p className="mt-1 text-sm text-slate-400">
+          开启「下载收费」并设置金额后，前台该产品（含排课系统导出）会先弹出收款二维码再允许下载。
+          在「产品中心」新增产品后，这里会自动出现对应条目，只需填入金额即可。
+        </p>
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-500">加载中…</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-white/5">
+            {products.map((p) => {
+              const it = form.items[p.id] || { paid: false, amount: 0 };
+              return (
+                <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="text-xl">{p.icon || "📦"}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-sm font-medium text-slate-100">{p.title}</span>
+                    <span className="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400">
+                      {p.type === "tool" ? "独立工具" : p.type === "solution" ? "解决方案" : "产品"}
+                    </span>
+                  </span>
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={it.paid}
+                      onChange={(e) => setItem(p.id, { paid: e.target.checked })}
+                      className="h-4 w-4 accent-brand-cyan"
+                    />
+                    下载收费
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-slate-400">¥</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      disabled={!it.paid}
+                      value={it.amount}
+                      onChange={(e) => setItem(p.id, { amount: Number(e.target.value) || 0 })}
+                      className="input-base w-24 disabled:opacity-40"
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={busy} className="btn-primary">
+          {busy ? "保存中…" : "保存付费设置"}
+        </button>
+        <button onClick={load} className="btn-ghost">刷新</button>
+      </div>
+      {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+      {err && <p className="text-sm text-red-400">{err}</p>}
     </div>
   );
 }

@@ -35,9 +35,29 @@ export default async function HomePage() {
           <Link href="/products" className="btn-ghost">进入产品中心 →</Link>
         </div>
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {products.slice(0, 4).map((p) => (
+          {products.slice(0, 3).map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
+
+          {/* 排课系统：免费使用 · 下载付费 */}
+          <Link
+            href="/schedule"
+            className="glass glass-hover group flex flex-col p-6"
+          >
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/5 text-2xl transition group-hover:scale-110">
+              🗓️
+            </div>
+            <div className="mt-4 inline-flex w-fit rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs text-emerald-300">
+              免费使用 · 下载付费
+            </div>
+            <h3 className="mt-3 text-lg font-semibold text-white">智能排课系统</h3>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">
+              导入名册与旧课表，一键自动排课、三视图校核、拖拽微调。导出课表需支付少量费用。
+            </p>
+            <div className="mt-4 text-sm font-medium text-brand-blue transition group-hover:translate-x-1">
+              免费开始排课 →
+            </div>
+          </Link>
         </div>
       </section>
 

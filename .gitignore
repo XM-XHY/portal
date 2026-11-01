@@ -32,3 +32,6 @@ next-env.d.ts
 
 # 运行时数据（含默认种子，生产请按需备份）
 /data
+
+# workbuddy 本地数据（含项目笔记与本地配置，不入库）
+.workbuddy/
