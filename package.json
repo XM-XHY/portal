@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cloudbase": "node scripts/build-cloudbase.mjs && node scripts/postbuild-cloudbase.mjs",
     "start": "next start",
     "lint": "next lint",
     "deploy": "vercel --prod",

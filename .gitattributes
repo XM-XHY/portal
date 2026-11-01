@@ -1,0 +1,5 @@
+# CloudBase / Linux 启动脚本必须以 LF 换行。
+# 本机 core.autocrlf=true，若不锁死，Windows 检出会变成 CRLF，
+# 上传到云函数后会报 "^M: bad interpreter"，且极难排查。
+scf_bootstrap text eol=lf
+*.sh text eol=lf
