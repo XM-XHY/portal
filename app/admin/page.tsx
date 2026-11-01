@@ -1658,14 +1658,17 @@ function PayConfigManager() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [qrFile, setQrFile] = useState<File | null>(null);
+  const [payStatus, setPayStatus] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([
+      const [p, c, st] = await Promise.all([
         fetch("/api/products", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/payconfig", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/pay/status", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
       ]);
+      setPayStatus(st);
       const items = (p.items || []) as Billable[];
       const list: Billable[] = [
         ...items,
@@ -1739,7 +1742,27 @@ function PayConfigManager() {
   return (
     <div className="space-y-6">
       <div className="glass p-6">
-        <h3 className="text-lg font-semibold text-white">收款二维码</h3>
+        <h3 className="text-lg font-semibold text-white">支付通道状态</h3>
+        <p className="mt-1 text-sm text-slate-400">
+          真实收款由微信支付 / 支付宝商户通道完成（下单 → 用户扫码 → 网关回调确认 → 自动解锁下载）。
+          商户密钥等敏感信息请在 Vercel 项目「环境变量」中配置，<b className="text-slate-200">切勿</b>在此处填写。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <ChannelBadge label="微信支付" on={!!payStatus?.wechat} active={payStatus?.provider === "wechat"} envs={["WECHAT_PAY_MCH_ID", "WECHAT_PAY_APP_ID", "WECHAT_PAY_API_V3_KEY", "WECHAT_PAY_SERIAL", "WECHAT_PAY_PRIVATE_KEY", "WECHAT_PAY_CERT"]} />
+          <ChannelBadge label="支付宝" on={!!payStatus?.alipay} active={payStatus?.provider === "alipay"} envs={["ALIPAY_APP_ID", "ALIPAY_PRIVATE_KEY", "ALIPAY_PUBLIC_KEY"]} />
+          <span className={`rounded-full px-3 py-1 text-sm ${payStatus?.provider ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
+            {payStatus?.provider ? `当前通道：${payStatus.provider === "wechat" ? "微信支付" : payStatus.provider === "alipay" ? "支付宝" : "模拟(mock)"}` : "当前：未配置真实通道"}
+          </span>
+        </div>
+        {!payStatus?.provider && (
+          <p className="mt-3 text-xs text-amber-400">
+            提示：未配置真实通道时，前台下载会提示「支付通道未配置」。请到 Vercel 设置 <code className="rounded bg-black/30 px-1">PAY_PROVIDER=wechat|alipay</code> 并补全对应商户密钥后重新部署。
+          </p>
+        )}
+      </div>
+
+      <div className="glass p-6">
+        <h3 className="text-lg font-semibold text-white">收款二维码（自助备用）</h3>
         <p className="mt-1 text-sm text-slate-400">
           用户在前台下载需付费的资源时，会展示此二维码。上传一张微信 / 支付宝收款码图片，或粘贴图片链接。
         </p>
@@ -1838,6 +1861,17 @@ function PayConfigManager() {
       {msg && <p className="text-sm text-emerald-400">{msg}</p>}
       {err && <p className="text-sm text-red-400">{err}</p>}
     </div>
+  );
+}
+
+function ChannelBadge({ label, on, active, envs }: { label: string; on: boolean; active: boolean; envs: string[] }) {
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-sm ${active ? "bg-brand-blue/30 text-white" : on ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-slate-400"}`}
+      title={`需配置：${envs.join(", ")}`}
+    >
+      {label}：{active ? "✅ 生效中" : on ? "已配置" : "未配置"}
+    </span>
   );
 }
 
