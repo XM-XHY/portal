@@ -31,8 +31,9 @@ export type Lead = {
  * - sched 排课系统主数据（body 存完整状态 JSON，零 DDL）
  * - sched_share 排课只读分享快照（body 存 state JSON）
  * - paycfg 产品付费配置（body 存收款二维码 + 各产品下载付费金额）
+ * - order 真实支付订单（body 存订单 JSON，含网关流水号与状态，零 DDL）
  */
-export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc" | "sched" | "sched_share" | "paycfg";
+export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc" | "sched" | "sched_share" | "paycfg" | "order";
 
 /**
  * 统一内容实体：资讯（news）、产品（product）、解决方案（solution）、案例（case）共用。

@@ -344,6 +344,10 @@ export function generateSchedule(state: SchedState): SchedResult {
     );
   }
 
+  // 教师已承担课时统计（含继承旧课表），用于「一位老师任多门课」的周最大课时约束与均衡分配
+  const teacherLoad = new Map<string, number>();
+  const bumpLoad = (tid?: string) => { if (tid) teacherLoad.set(tid, (teacherLoad.get(tid) || 0) + 1); };
+
   if (rules.inheritOld && oldSchedule.length) {
     for (const e of oldSchedule) {
       const grid = perClass[e.classId];
@@ -353,6 +357,7 @@ export function generateSchedule(state: SchedState): SchedResult {
           teacherId: e.teacherId,
           roomId: e.roomId,
         };
+        bumpLoad(e.teacherId);
       }
     }
   }
@@ -372,11 +377,38 @@ export function generateSchedule(state: SchedState): SchedResult {
       }
   }
 
-  const teacherBySubject = new Map<string, SchedTeacher>();
-  for (const t of teachers) for (const s of t.subjects) teacherBySubject.set(s, teacherBySubject.get(s) || t);
+  // 一个科目可由多位老师任教（科目 -> 可授教师列表），支撑「一位老师任多门课」的均衡分配
+  const subjectTeachers = new Map<string, SchedTeacher[]>();
+  for (const t of teachers)
+    for (const s of t.subjects) {
+      const arr = subjectTeachers.get(s) || [];
+      arr.push(t);
+      subjectTeachers.set(s, arr);
+    }
 
   const oldTeacherFor = new Map<string, string>();
   for (const e of oldSchedule) oldTeacherFor.set(`${e.classId}|${e.subject}`, e.teacherId);
+
+  // 剩余可排课时：周最大课时 - 已承担；maxHours<=0 视为不限
+  const remaining = (t: SchedTeacher) => (t.maxHours > 0 ? t.maxHours - (teacherLoad.get(t.id) || 0) : Infinity);
+  /** 为某(班级,科目)选择任教老师：优先沿用旧课表指定老师；否则在可授老师中优先剩余课时多者，均衡多门课负担 */
+  function chooseTeacher(subject: string, classId: string): { id: string; teacher?: SchedTeacher } {
+    const old = oldTeacherFor.get(`${classId}|${subject}`);
+    if (old) {
+      const t = teachers.find((x) => x.id === old);
+      if (t) return { id: old, teacher: t };
+    }
+    const cands = subjectTeachers.get(subject) || [];
+    if (!cands.length) return { id: "" };
+    const sorted = [...cands].sort((a, b) => {
+      const ra = remaining(a), rb = remaining(b);
+      const ha = ra > 0 ? 1 : 0, hb = rb > 0 ? 1 : 0;
+      if (ha !== hb) return hb - ha; // 尚有剩余课时的老师优先
+      return rb - ra; // 同档则剩余课时多者优先（既均衡又避免压垮低上限老师）
+    });
+    const pick = sorted[0];
+    return { id: pick.id, teacher: pick };
+  }
 
   const labRooms = rooms.filter((r) => r.type === "实验室");
   const normalRooms = rooms.filter((r) => r.type === "普通");
@@ -411,8 +443,7 @@ export function generateSchedule(state: SchedState): SchedResult {
     const subjDef = subjects.find((s) => s.classId === classId && s.subject === subject);
     if (!cls || !subjDef) continue;
     let have = placed.get(key) || 0;
-    const teacherId = oldTeacherFor.get(key) || teacherBySubject.get(subject)?.id || "";
-    const teacher = teachers.find((t) => t.id === teacherId);
+    const { id: teacherId, teacher } = chooseTeacher(subject, classId);
     const roomId = pickRoom(subjDef.needLab, cls.size);
 
     while (have < need) {
@@ -423,6 +454,7 @@ export function generateSchedule(state: SchedState): SchedResult {
           if (teacher && (teacherBusyAt(teacherId, d, p) || isUnavailable(teacher, d, p))) continue;
           if (roomId && roomBusyAt(roomId, d, p)) continue;
           perClass[classId][d][p] = { subject, teacherId, roomId };
+          bumpLoad(teacherId);
           have++;
           placedThis = true;
           break outer;
@@ -433,6 +465,7 @@ export function generateSchedule(state: SchedState): SchedResult {
           for (let p = 0; p < ppd; p++) {
             if (!perClass[classId][d][p]) {
               perClass[classId][d][p] = { subject, teacherId, roomId };
+              bumpLoad(teacherId);
               have++;
               break;
             }
@@ -448,9 +481,22 @@ export function generateSchedule(state: SchedState): SchedResult {
   let totalPlaced = 0;
   for (const [k, v] of required) {
     totalReq += v;
-    totalPlaced += Math.min(v, placed.get(k) || 0);
+    // 基于生成的 perClass 实际统计落位（含继承旧课表），避免误报
+    const [classId, subject] = k.split("|");
+    const grid = perClass[classId];
+    let cnt = 0;
+    if (grid)
+      for (let d = 0; d < days; d++)
+        for (let p = 0; p < ppd; p++) if (grid[d][p]?.subject === subject) cnt++;
+    totalPlaced += Math.min(v, cnt);
   }
-  const summary = `共 ${classes.length} 个班级、${required.size} 个(班×科目)排课单元；应排 ${totalReq} 节，已落位 ${totalPlaced} 节；检测到 ${conflicts.length} 处冲突（可在「班级/教师/教室」视图中拖拽微调后重新校验）。`;
+  const overloads = teachers
+    .filter((t) => t.maxHours > 0 && (teacherLoad.get(t.id) || 0) > t.maxHours)
+    .map((t) => `${t.name}(${teacherLoad.get(t.id)}/${t.maxHours})`);
+  const overloadNote = overloads.length
+    ? `；⚠️ ${overloads.length} 位老师超出周最大课时：${overloads.join("、")}（请增加可授该科老师或调高上限）`
+    : "";
+  const summary = `共 ${classes.length} 个班级、${required.size} 个(班×科目)排课单元；应排 ${totalReq} 节，已落位 ${totalPlaced} 节；检测到 ${conflicts.length} 处冲突（可在「班级/教师/教室」视图中拖拽微调后重新校验）${overloadNote}。`;
 
   return { perClass, conflicts, generatedAt: new Date().toISOString(), summary };
 }
