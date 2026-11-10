@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getAdmins, type Admin } from "./store";
-import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/runtime-phase";
+import { isBuildPhase, buildPhaseSecret } from "@/lib/runtime-phase";
 
 const DEV_FALLBACK = "xx-tech-session-secret-change-me";
 
@@ -25,8 +25,8 @@ function getSecret(): string {
   }
 
   if (isBuildPhase()) {
-    // 构建期占位：构建阶段不会签发真实会话
-    cachedSecret = BUILD_PHASE_PLACEHOLDER;
+    // 构建期占位：构建阶段不会签发真实会话（随机值，无法被伪造）
+    cachedSecret = buildPhaseSecret();
     return cachedSecret;
   }
 

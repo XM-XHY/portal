@@ -179,7 +179,7 @@
 
   function needLogin(msg) {
     lockNow();
-    showGate('登录教师工作台', msg || ('新用户注册即享 <b>' + (C.trialDays || 7) + ' 天免费试用</b>，' +
+    showGate('登录教师工作台', esc(msg) || ('新用户注册即享 <b>' + (C.trialDays || 7) + ' 天免费试用</b>，' +
       '试用到期后通过微信扫码支付 <b>' + (C.priceText || '20 元 / 月') + '</b> 继续使用。'),
       [{ label: '注册 / 登录', onClick: goAccount },
        { label: '打开在线版', cls: 'ghost', onClick: goSite }],
@@ -188,7 +188,7 @@
   function needPay(e) {
     lockNow();
     var label = e && e.statusText || '权限未开通';
-    showGate('使用权限' + label, '当前状态：<b>' + esc(label) + '</b>。' +
+    showGate('使用权限' + esc(label), '当前状态：<b>' + esc(label) + '</b>。' +
       (e && e.validUntilText ? '最近使用期限：' + esc(fmt(e.validUntilText)) + '。<br>' : '') +
       '请微信扫码支付 <b>' + (C.priceText || '20 元 / 月') + '</b> 开通或延续使用权限。',
       [{ label: '前往订阅', onClick: goAccount },

@@ -96,7 +96,7 @@
       ['已购月数', (u.totalPaidMonths || 0) + ' 个月'],
       ['企业网站账号', u.siteLink && u.siteLink.siteAccount ? esc(u.siteLink.siteAccount) +
         '（' + esc(u.siteLink.status || 'none') + '）' : '—'],
-      ['当前状态', e.statusText + (e.canUse ? ' · 可正常使用' : ' · 访问受限')]
+      ['当前状态', esc(e.statusText) + (e.canUse ? ' · 可正常使用' : ' · 访问受限')]
     ];
     $('kvGrid').innerHTML = rows.map(function (r) {
       return '<div class="ent-kv"><div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div></div>';
@@ -209,7 +209,7 @@
     var map = { pending: '待支付', paid: '已支付', failed: '失败', closed: '已关闭', refunded: '已退款' };
     $('orderRows').innerHTML = r.data.data.list.map(function (o) {
       return '<tr><td>' + esc(o.outTradeNo) + '</td><td>' + (o.kind === 'auto' ? '自动续费' : '手动支付') +
-        '</td><td>' + yuan(o.amountFen) + '</td><td>' + (map[o.status] || o.status) + '</td><td>' +
+        '</td><td>' + yuan(o.amountFen) + '</td><td>' + esc(map[o.status] || o.status) + '</td><td>' +
         fmt(o.createdAt) + '</td><td>' + fmt(o.paidAt) + '</td></tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">暂无订单</td></tr>';
   }

@@ -15,7 +15,7 @@
  * 两者都没有时（仅本地开发）使用固定兜底值，部署时务必配置随机强值。
  */
 import crypto from "node:crypto";
-import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/runtime-phase";
+import { isBuildPhase, buildPhaseSecret } from "@/lib/runtime-phase";
 
 export type GrantMode = "paid" | "free" | "self";
 
@@ -30,7 +30,7 @@ function secret(): string {
   const s = process.env.PAY_GRANT_SECRET?.trim() || process.env.ADMIN_SESSION_SECRET?.trim();
   if (s) return s;
   // 构建期占位：next build 阶段不会签发真实付费票据（见 lib/runtime-phase.ts）
-  if (isBuildPhase()) return BUILD_PHASE_PLACEHOLDER;
+  if (isBuildPhase()) return buildPhaseSecret();
   if (process.env.NODE_ENV === "production") {
     // SEC-03：生产环境缺失票据密钥时拒绝签发，避免付费票据被伪造（fail-fast）
     throw new Error(

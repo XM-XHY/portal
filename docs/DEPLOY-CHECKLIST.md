@@ -49,7 +49,7 @@ CLOUDBASE_PG_API_KEY
 
 | 变量 | 现状 | 缺失后果 |
 |---|---|---|
-| `ADMIN_PASSWORD_SALT` | **缺失** | **生产启动即抛错退出**（FAIL 级） |
+| `ADMIN_PASSWORD_SALT` | **缺失** | **运行期用到口令哈希/会话签发时抛错**（FAIL 级） |
 | `PAY_GRANT_SECRET` | 缺失 | 回落 `ADMIN_SESSION_SECRET`，可用但密钥未分离 |
 | `WORK_SESSION_SECRET` | 缺失 | 回落 `ADMIN_SESSION_SECRET`，可用但密钥未分离 |
 | `INITIAL_ADMIN_PASSWORD` | 缺失 | 仅影响全新空库首次播种；已有库无影响 |
@@ -58,8 +58,17 @@ CLOUDBASE_PG_API_KEY
 - [ ] 值只经控制台/API 传递，**不要贴进聊天记录、issue、提交信息**
 - [ ] 注入时保留原有 22 项（`envParamsReplaceAll=false` 语义是合并，不是覆盖）
 
+> ℹ️ **密钥解析时机（2026-11-10 修复）**：四个密钥模块（口令盐 / 后台会话 / 作品会话 /
+> 付费票据）改为**惰性求值** —— 只有真正用到该密钥的那一刻才解析。
+> 因此「构建期」（`next build`，云托管只在容器运行时注入环境变量）不再因缺密钥而崩溃，
+> 源码构建可以正常通过；**运行期**缺密钥依然 fail-fast 抛错，绝不回退到静态弱密钥。
+>
 > ⚠️ **换盐的连锁效应**：`ADMIN_PASSWORD_SALT` 一旦从旧静态值换成新随机值，
-> 库中所有 `pw_hash` 立即失效，**后台将无法登录**。必须执行第 4 节的第 1 步。
+> 库中所有 `pw_hash` 立即失效，**后台将无法登录**。
+> 本次修复已内置**旧盐回退校验**（仅校验存量哈希，不用于任何新写入），
+> 存量 4 个管理员（admin / market / tao / lin）换盐后仍可登录；
+> 但**仍建议执行第 4 节第 1 步重算口令**（把弱盐哈希彻底换成新盐哈希）。
+> 全部重算完成后，可设置 `ADMIN_PASSWORD_LEGACY_COMPAT=off` 关闭回退校验。
 
 ---
 
@@ -88,7 +97,9 @@ node scripts/rotate-admin-password.mjs --apply    # 再实际写入
 
 - [ ] `admin`（super）已重算
 - [ ] `market`（lead）已重算（口令另设，不要与 admin 相同）
+- [ ] `tao` / `lin` 已重算（若仍使用旧盐哈希，靠回退校验登录，重算后彻底换新盐）
 - [ ] 用新口令登录后台成功
+- [ ] （可选，全部重算后）设置 `ADMIN_PASSWORD_LEGACY_COMPAT=off` 关闭旧盐回退校验
 
 ### 4.2 功能验证
 
