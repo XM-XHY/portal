@@ -125,15 +125,29 @@ describe("存量账号兼容：旧静态盐生成的口令哈希仍可校验", (
     process.env.NODE_ENV = "production";
     process.env.NEXT_PHASE = "phase-production-build";
     const { verifyPassword } = await import("@/lib/data/hash");
-    // 以下哈希取自生产 CloudBase PG 库 public.admins（由旧静态盐生成）
+    // 生产 CloudBase PG 库 public.admins 的既有 pw_hash（由旧静态盐生成）：
+    //   admin / market 共用一组，tao / lin 共用另一组。
+    // 它们无法反推明文，因此这里验证的是**回退分支的判定逻辑**：
+    // 当传入明文的旧盐哈希恰好等于存量样本时，必须校验通过（正向断言）。
     const legacyHashes = [
       "cef30ce13b6c2f133c1feb19497efc1442b667c8e90e5da7a1230cfd0247db35",
       "9b1b932a8e1ea92a32783b27baa25842d38b01414bc14259c579e44a278f15f4",
     ];
+    // 用当前盐（构建期占位）计算的哈希必然不同于存量样本 → 必须走旧盐回退分支
     for (const h of legacyHashes) {
-      // 旧盐的哈希必然不是新盐哈希，因此必须靠回退分支命中
       expect(verifyPassword("__probe_wrong__", h)).toBe(false);
     }
+
+    // 正向断言：对「旧静态盐 + 已知明文」构造出的哈希，校验必须通过。
+    // 这正是存量管理员登录时走的分支（生产库中的样本即此类哈希）。
+    const knownPw = "LegacyAdminPassword123";
+    const legacyHash = crypto
+      .createHash("sha256")
+      .update(LEGACY_STATIC_SALT + knownPw)
+      .digest("hex");
+    expect(verifyPassword(knownPw, legacyHash)).toBe(true);
+    // 错误明文仍必须失败
+    expect(verifyPassword("NotThePassword123", legacyHash)).toBe(false);
   });
 });
 

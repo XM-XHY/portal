@@ -9,7 +9,7 @@
  */
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/build-phase";
+import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/runtime-phase";
 
 export const WORK_COOKIE = "work_session";
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -17,7 +17,7 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 function secret(): string {
   const s = process.env.WORK_SESSION_SECRET?.trim() || process.env.ADMIN_SESSION_SECRET?.trim();
   if (s) return s;
-  // 构建期占位：next build 阶段不会签发真实作品会话（见 lib/build-phase.ts）
+  // 构建期占位：next build 阶段不会签发真实作品会话（见 lib/runtime-phase.ts）
   if (isBuildPhase()) return BUILD_PHASE_PLACEHOLDER;
   if (process.env.NODE_ENV === "production") {
     // SEC-03：生产环境缺失作品会话密钥时拒绝签发，避免会员会话被伪造（fail-fast）

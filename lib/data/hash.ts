@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/build-phase";
+import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/runtime-phase";
 
 // 盐值：密码哈希与 JSON 存储、Supabase 存储共用同一套，保证两套存储切换时账号一致。
 // SEC-03：生产环境缺失盐时必须 fail-fast，禁止使用写死的静态盐（等同无盐，可被预计算/彩虹表破解）。

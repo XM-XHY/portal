@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getAdmins, type Admin } from "./store";
-import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/build-phase";
+import { isBuildPhase, BUILD_PHASE_PLACEHOLDER } from "@/lib/runtime-phase";
 
 const DEV_FALLBACK = "xx-tech-session-secret-change-me";
 
@@ -12,7 +12,7 @@ let cachedSecret: string | null = null;
  * 解析后台会话签名密钥（惰性 + 记忆化）。
  *
  * ⚠️ 必须惰性求值：模块加载时就解析密钥，会让 next build 的静态生成阶段
- * 因缺少运行时环境变量而崩溃（见 lib/build-phase.ts 注释）。
+ * 因缺少运行时环境变量而崩溃（见 lib/runtime-phase.ts 注释）。
  * 运行期缺密钥仍然 fail-fast，避免后台会话被伪造（SEC-03）。
  */
 function getSecret(): string {

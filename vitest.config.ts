@@ -12,6 +12,8 @@ export default defineConfig({
     // 覆盖率仅统计本次补全用例覆盖的纯函数模块，避免被整个代码库稀释。
     coverage: {
       include: [
+        "**/lib/data/hash.ts",
+        "**/lib/runtime-phase.ts",
         "**/lib/pay-grant.ts",
         "**/lib/session.ts",
         "**/lib/work-session.ts",
