@@ -23,11 +23,22 @@ export async function setAdminPassword(id: string, newPw: string): Promise<boole
   return getRepo().setAdminPassword(id, newPw);
 }
 
-/** 新增账号（管理员 / 员工），用户名重复时抛错 */
+/** 修改账号角色（超管在后台「用户与角色」调整权限） */
+export async function setAdminRole(id: string, role: import("./data/types").Role): Promise<boolean> {
+  return getRepo().setAdminRole(id, role);
+}
+
+/** 设置账号的逐用户权限覆盖（传 null 清除覆盖，回退角色默认） */
+export async function setAdminPerms(id: string, perms: string[] | null): Promise<boolean> {
+  return getRepo().setAdminPerms(id, perms);
+}
+
+/** 新增账号（管理员 / 员工 / 教师），用户名重复时抛错 */
 export async function addAdmin(input: {
   username: string;
   password: string;
   role: import("./data/types").Role;
+  perms?: string[];
 }) {
   return getRepo().addAdmin(input);
 }
@@ -77,8 +88,22 @@ export async function getContent(id: string): Promise<ContentItem | null> {
   return getRepo().getContent(id);
 }
 
+/** 保存（upsert）若干条目：安全，不会删除其他数据 */
 export async function saveContents(items: ContentItem[]): Promise<ContentItem[]> {
   return getRepo().saveContents(items);
+}
+
+/**
+ * 整体替换内容表：写入传入条目并删除其余条目。
+ * ⚠️ 危险操作，仅限后台「删除条目」等明确需要全量覆盖的场景使用。
+ */
+export async function replaceContents(items: ContentItem[]): Promise<ContentItem[]> {
+  return getRepo().replaceContents(items);
+}
+
+/** 按 id 精确删除内容条目 */
+export async function deleteContents(ids: string[]): Promise<void> {
+  return getRepo().deleteContents(ids);
 }
 
 /** 历史兼容：保存全部内容（含资讯/产品/案例） */

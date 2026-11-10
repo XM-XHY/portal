@@ -8,6 +8,8 @@ export const PAYCFG_ID = "paycfg-main";
 
 /** 排课系统等独立产品的付费条目 id（非产品中心条目） */
 export const SCHED_PAY_ID = "sched";
+/** 均衡分班系统（独立工具） */
+export const BALANCE_PAY_ID = "balance";
 
 export type PayItem = { paid: boolean; amount: number };
 

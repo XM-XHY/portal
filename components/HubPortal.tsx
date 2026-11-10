@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ROLE_LABELS, type Role } from "@/lib/auth";
 import { docIcon } from "@/lib/product-meta";
+import HubMaterials from "@/components/HubMaterials";
 
 type HubDoc = {
   id: string;
@@ -99,6 +100,7 @@ export default function HubPortal({ username, role }: { username: string; role: 
   const [busy, setBusy] = useState(false);
   const [genErr, setGenErr] = useState("");
   const [copied, setCopied] = useState("");
+  const [materialTick, setMaterialTick] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,6 +122,7 @@ export default function HubPortal({ username, role }: { username: string; role: 
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "生成失败");
+      if (data.materialId) setMaterialTick((t) => t + 1);
       setMessages((m) => [
         ...m,
         {
@@ -252,6 +255,7 @@ export default function HubPortal({ username, role }: { username: string; role: 
               ))}
             </ul>
           )}
+          <HubMaterials tick={materialTick} onOpen={(m) => setViewer({ title: m.title, text: m.content })} />
         </section>
 
         {/* 右：对话生成材料 */}

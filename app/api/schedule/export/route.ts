@@ -20,18 +20,21 @@ export async function GET(req: NextRequest) {
 
   let state: SchedState | null = null;
   if (token) {
+    // 分享链接导出免费：分享令牌本身就是访问授权，持有有效 token 即可导出，
+    // 不再要求收件人二次付费（付费仅发生在分享发布方 / 后台管理端）。
     state = await getShareSnapshot(token);
   } else {
     const admin = await getAdminFromCookie();
     if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-    if (!can(admin.role, "schedule.manage"))
+    if (!can(admin, "schedule.manage"))
       return NextResponse.json({ error: "无权限" }, { status: 403 });
     state = await getScheduleState();
   }
   if (!state || !state.result)
     return NextResponse.json({ error: "尚无课表，请先生成" }, { status: 400 });
 
-  const XLSX = await import("xlsx");
+  // 表格写出统一走 lib/sheet（exceljs），替换存在 high 漏洞且无补丁的 xlsx@0.18.5
+  const sheetLib = await import("@/lib/sheet");
   const days = state.rules.days;
   const ppd = state.rules.periodsPerDay;
   const dayNames = Array.from({ length: days }, (_, i) => `周${"一二三四五六日"[i]}`);
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
   const roomName = new Map(state.rooms.map((r) => [r.id, r.name]));
   const className = new Map(state.classes.map((c) => [c.id, c.name]));
 
-  const wb = XLSX.utils.book_new();
+  const sheets: import("@/lib/sheet").SheetSpec[] = [];
 
   function cellText(cell: Cell, view: "class" | "teacher" | "room"): string {
     if (!cell) return "";
@@ -66,19 +69,21 @@ export async function GET(req: NextRequest) {
     if (!ids.length) return;
     for (const id of ids) {
       const g = grid[id];
-      const rows: any[] = [];
+      const rows: string[][] = [];
       rows.push([`${labelOf(id)} 课表`, ...dayNames]);
       for (let p = 0; p < ppd; p++) {
         const time = state!.rules.periodTimes[p] || "";
-        const row: any[] = [`第${p + 1}节\n${time}`];
+        const row: string[] = [`第${p + 1}节\n${time}`];
         for (let d = 0; d < days; d++) row.push(cellText(g[d]?.[p] || null, view));
         rows.push(row);
       }
-      const ws = XLSX.utils.aoa_to_sheet(rows);
       // 列宽 / 行高
-      ws["!cols"] = [{ wch: 14 }, ...Array.from({ length: days }, () => ({ wch: 18 }))];
-      ws["!rows"] = [{ hpt: 22 }, ...Array.from({ length: ppd }, () => ({ hpt: 34 }))];
-      XLSX.utils.book_append_sheet(wb, ws, `${labelOf(id)}`.slice(0, 28));
+      sheets.push({
+        name: `${labelOf(id)}`,
+        rows,
+        colWidths: [14, ...Array.from({ length: days }, () => 18)],
+        rowHeights: [22, ...Array.from({ length: ppd }, () => 34)],
+      });
     }
   }
 
@@ -92,7 +97,7 @@ export async function GET(req: NextRequest) {
     addSheet("教室", rv, (id) => roomName.get(id) || id, "room");
   }
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buf = await sheetLib.buildWorkbookBuffer(sheets);
   const fname = encodeURIComponent(`课表_${new Date().toISOString().slice(0, 10)}.xlsx`);
   return new NextResponse(buf, {
     headers: {

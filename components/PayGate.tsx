@@ -20,7 +20,8 @@ export default function PayGate({
   productId: string;
   label: string;
   className?: string;
-  onGranted: () => void;
+  /** grant 为服务端签发的付费授权票据；受保护的服务端下载接口需要带上它 */
+  onGranted: (grant?: string) => void;
   client?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -40,9 +41,12 @@ export default function PayGate({
   const [selfMode, setSelfMode] = useState(false);
   const [selfQr, setSelfQr] = useState("");
   const [selfNote, setSelfNote] = useState("");
+  const [selfBusy, setSelfBusy] = useState(false);
+  const [selfErr, setSelfErr] = useState("");
 
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const grantedRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   function stopPolling() {
     if (timer.current) {
@@ -64,7 +68,7 @@ export default function PayGate({
       const data = await res.json().catch(() => ({}));
 
       if (data.free) {
-        onGranted(); // 免费，直接放行
+        onGranted(data.grant); // 免费，带免费票据放行（服务端接口统一校验）
         return;
       }
 
@@ -75,6 +79,7 @@ export default function PayGate({
         setSelfNote(data.qrNote || "微信 / 支付宝 扫码支付");
         setAmount(data.amount);
         setProvider("");
+        setSelfErr("");
         setOpen(true);
         return;
       }
@@ -118,9 +123,10 @@ export default function PayGate({
           grantedRef.current = true;
           stopPolling();
           setPaid(true);
+          const grant = d.grant as string | undefined;
           setTimeout(() => {
             setOpen(false);
-            onGranted();
+            onGranted(grant);
           }, 700);
         }
         if (d.expiresAt) {
@@ -137,6 +143,31 @@ export default function PayGate({
     }, 2000);
   }
 
+  /**
+   * 自助扫码：点击「我已完成支付」必须向服务端申报。
+   * 服务端写审计日志留痕并签发 short-lived self 票据，前端再凭票据请求下载接口。
+   * 不再像旧版那样前端直接放行、服务端毫无记录。
+   */
+  async function confirmSelfPaid() {
+    setSelfBusy(true);
+    setSelfErr("");
+    try {
+      const r = await fetch("/api/pay/self-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, client }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.grant) throw new Error(d.error || "付款申报失败，请稍后重试");
+      setOpen(false);
+      onGranted(d.grant as string);
+    } catch (e: any) {
+      setSelfErr(e?.message || "付款申报失败，请稍后重试");
+    } finally {
+      setSelfBusy(false);
+    }
+  }
+
   // 模拟支付（仅 mock 模式，便于联调）：通知后端标记已支付
   async function simulatePaid() {
     try {
@@ -150,6 +181,22 @@ export default function PayGate({
 
   useEffect(() => () => stopPolling(), []);
 
+  // A-03：付费弹窗是可键盘/读屏操作的关键路径。
+  // 打开时把焦点移入模态框，ESC 可关闭，避免键盘用户被困在遮罩里无法退出。
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        stopPolling();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    dialogRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   return (
     <>
       <button onClick={begin} disabled={loading} className={className}>
@@ -158,9 +205,17 @@ export default function PayGate({
 
       {open && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={() => { stopPolling(); setOpen(false); }}>
-          <div className="glass w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-2xl">{selfMode ? "💰" : "💳"}</div>
-            <h3 className="mt-2 text-lg font-semibold text-white">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="paygate-title"
+            tabIndex={-1}
+            className="glass w-full max-w-sm p-6 text-center outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-2xl" aria-hidden="true">{selfMode ? "💰" : "💳"}</div>
+            <h3 id="paygate-title" className="mt-2 text-lg font-semibold text-white">
               {selfMode ? "扫码支付后下载（自助）" : "扫码支付后下载"}
             </h3>
             <p className="mt-1 text-sm text-slate-400">
@@ -181,11 +236,12 @@ export default function PayGate({
                 <p className="mt-3 text-xs text-slate-400">
                   {selfNote}
                   <br />
-                  扫码支付完成后点击下方按钮即可下载
+                  扫码付款后点击下方按钮申报，管理员会核对到账记录
                 </p>
+                {selfErr && <p className="mt-2 text-xs text-red-400">{selfErr}</p>}
                 <div className="mt-5 flex gap-2">
-                  <button onClick={() => { setOpen(false); onGranted(); }} className="btn-primary flex-1">
-                    我已完成支付，下载
+                  <button onClick={confirmSelfPaid} disabled={selfBusy} className="btn-primary flex-1 disabled:opacity-50">
+                    {selfBusy ? "申报中…" : "我已完成支付，下载"}
                   </button>
                   <button onClick={() => setOpen(false)} className="btn-ghost">取消</button>
                 </div>

@@ -1,0 +1,40 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "startServerCommand": "npm run start -- -p 3000",
+      "startServerReadyPattern": "Ready in",
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/works",
+        "http://localhost:3000/admin"
+      ],
+      "settings": {
+        "preset": "desktop"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:accessibility": ["error", { "minScore": 1 }],
+        "color-contrast": "error",
+        "image-alt": "error",
+        "input-image-alt": "error",
+        "link-name": "error",
+        "button-name": "error",
+        "label": "error",
+        "list": "error",
+        "listitem": "error",
+        "aria-required-attr": "error",
+        "aria-valid-attr-value": "error",
+        "aria-command-name": "error",
+        "document-title": "error",
+        "html-has-lang": "error",
+        "html-lang-valid": "error",
+        "bypass": "error"
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

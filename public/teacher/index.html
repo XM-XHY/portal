@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>教师工作台</title>
+<!-- 在线订阅版：已移除 PWA manifest 与 Service Worker，不提供任何离线缓存或离线使用能力 -->
+<meta name="theme-color" content="#1f2a44" />
+<style>
+  :root{
+    --nav-bg:#1f2a44; --nav-bg2:#26344f; --nav-active:#3b82f6;
+    --bg:#f3f5f9; --panel:#fff; --ink:#1f2937; --muted:#6b7280;
+    --line:#e5e7eb; --green:#16a34a; --red:#dc2626; --amber:#f59e0b;
+    --blue:#3b82f6; --purple:#7c3aed; --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
+  html,body{height:100%;background:var(--bg);color:var(--ink);}
+  .app{display:flex;min-height:100vh;}
+  .nav{width:226px;background:linear-gradient(180deg,var(--nav-bg),var(--nav-bg2));color:#e5e7eb;display:flex;flex-direction:column;flex-shrink:0;}
+  .nav .logo{padding:16px 16px 10px;}
+  .nav .logo h1{font-size:16px;font-weight:700;color:#fff;}
+  .nav .logo p{font-size:11px;color:#9aa6c0;margin-top:4px;}
+  .nav .menu{flex:1;overflow-y:auto;padding:6px 8px;}
+  .nav .group{font-size:11px;color:#7e8aa8;padding:12px 12px 4px;letter-spacing:1px;}
+  .nav .item{padding:9px 12px;border-radius:8px;font-size:13.5px;cursor:pointer;display:flex;align-items:center;gap:9px;color:#cbd5e1;}
+  .nav .item:hover{background:rgba(255,255,255,.06);color:#fff;}
+  .nav .item.active{background:var(--nav-active);color:#fff;font-weight:600;}
+  .nav .item .ic{width:18px;text-align:center;}
+  .nav .help{margin:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;}
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{height:54px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:12px;}
+  .topbar select{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;color:var(--ink);max-width:200px;}
+  .topbar .who{font-size:13px;color:var(--muted);}
+  .topbar .date{margin-left:auto;font-size:13px;color:var(--muted);}
+  .topbar .save-tip{font-size:11px;color:var(--green);background:#ecfdf3;border:1px solid #bbf7d0;padding:4px 8px;border-radius:6px;}
+  .content{flex:1;overflow-y:auto;padding:18px;}
+  .view-title{font-size:20px;font-weight:700;margin-bottom:4px;}
+  .view-desc{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+  .tip{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.6;margin-bottom:16px;}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
+  .stat .num{font-size:28px;font-weight:800;color:var(--nav-active);}
+  .stat .lbl{font-size:12.5px;color:var(--muted);margin-top:4px;}
+  .stat .delta{font-size:12px;margin-top:4px;}
+  .up{color:var(--green);} .down{color:var(--red);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);}
+  .panel h3{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .panel h3 .badge{font-size:11px;color:var(--muted);font-weight:400;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;background:#fafbfc;}
+  tr:hover td{background:#f8fafc;}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#eef2ff;color:#4338ca;margin-right:6px;}
+  .tag.green{background:#ecfdf3;color:#15803d;} .tag.amber{background:#fffbeb;color:#b45309;} .tag.gray{background:#f1f5f9;color:#475569;}
+  .btn{border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;}
+  .btn.green{background:var(--green);color:#fff;} .btn.green:hover{background:#15803d;}
+  .btn.red{background:var(--red);color:#fff;} .btn.red:hover{background:#b91c1c;}
+  .btn.blue{background:var(--blue);color:#fff;} .btn.blue:hover{background:#2563eb;}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink);} .btn.ghost:hover{background:#f8fafc;}
+  .btn.sm{padding:5px 10px;font-size:12px;}
+  .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .row-actions .right{margin-left:auto;display:flex;gap:8px;}
+  .card-list{display:flex;flex-direction:column;gap:12px;}
+  .rec{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff;}
+  .rec .head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .rec .title{font-weight:700;font-size:14.5px;} .rec .meta{font-size:12px;color:var(--muted);margin:6px 0;}
+  .rec .body{font-size:13px;color:#374151;line-height:1.7;white-space:pre-wrap;}
+  .rec .foot{display:flex;gap:8px;margin-top:10px;}
+  .bar{height:14px;background:#eef2f7;border-radius:8px;overflow:hidden;min-width:120px;}
+  .bar>span{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);}
+  .bar.amber>span{background:linear-gradient(90deg,#f59e0b,#fbbf24);} .bar.red>span{background:linear-gradient(90deg,#dc2626,#f87171);}
+  .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .quick .q{background:linear-gradient(135deg,#eef2ff,#f5f3ff);border:1px solid #e0e7ff;border-radius:12px;padding:14px;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#4338ca;}
+  .quick .q:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:16px;width:560px;max-width:94vw;max-height:88vh;overflow-y:auto;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal h3{font-size:17px;margin-bottom:16px;}
+  .field{margin-bottom:12px;} .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;}
+  .field textarea{resize:vertical;min-height:80px;}
+  .sec-title{font-size:13px;font-weight:700;color:var(--nav-active);margin:14px 0 8px;padding-left:9px;border-left:3px solid var(--nav-active);}
+  .modal .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}
+  .empty{text-align:center;color:var(--muted);padding:26px;font-size:13px;}
+  .insight{background:linear-gradient(135deg,#eff6ff,#f5f3ff);border:1px solid #c7d2fe;border-radius:12px;padding:14px;font-size:13.5px;line-height:1.7;color:#1e3a8a;}
+  .res-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  .res{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:6px;}
+  .res .name{font-weight:700;font-size:14.5px;} .res .desc{font-size:12.5px;color:var(--muted);line-height:1.6;flex:1;}
+  .res .open{color:var(--blue);font-size:12.5px;text-decoration:none;font-weight:600;}
+  .warn{border-left:3px solid var(--red);background:#fef2f2;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;}
+  .warn b{color:var(--red);}
+  .fs-bg{position:fixed;inset:0;background:#0b1020;display:none;flex-direction:column;z-index:80;}
+  .fs-bg.show{display:flex;}
+  .fs-bar{height:50px;background:#111827;color:#fff;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;}
+  .fs-bar .t{font-size:14px;font-weight:600;} .fs-bar .x{margin-left:auto;background:#374151;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600;}
+  .fs-frame{flex:1;width:100%;border:0;background:#fff;}
+  .muted-note{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6;border-top:1px dashed var(--line);padding-top:10px;}
+  /* 附件（备课/作业/教研通用）：沿用现有白底卡片、圆角与状态色 */
+  .att-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+  .att-item{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fafbfc;}
+  .att-ico{font-size:19px;width:26px;text-align:center;flex-shrink:0;}
+  .att-main{flex:1;min-width:140px;}
+  .att-name{font-size:13px;font-weight:600;word-break:break-all;}
+  .att-meta{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
+  .att-state{font-size:11px;font-weight:700;white-space:nowrap;}
+  .att-state.ok{color:var(--green);} .att-state.busy{color:var(--blue);} .att-state.bad{color:var(--red);}
+  .att-bar{height:6px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-top:6px;}
+  .att-bar>span{display:block;height:100%;background:var(--blue);transition:width .15s;}
+  .att-picker{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;}
+  .att-chip{display:inline-block;font-size:11px;color:var(--muted);background:#f1f5f9;border-radius:6px;padding:2px 7px;margin:4px 4px 0 0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
+  .att-preview{margin-top:12px;border:1px dashed var(--line);border-radius:10px;padding:10px;text-align:center;}
+  .att-preview img{max-width:100%;max-height:320px;border-radius:8px;}
+  .att-spin{display:inline-block;width:10px;height:10px;border:2px solid #bfdbfe;border-top-color:var(--blue);border-radius:50%;animation:attspin .8s linear infinite;margin-right:5px;vertical-align:-1px;}
+  @keyframes attspin{to{transform:rotate(360deg);}}
+  @media(max-width:820px){
+    .nav{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:.2s;width:200px;}
+    .nav.open{transform:none;}
+    .cards,.quick{grid-template-columns:repeat(2,1fr);}
+    .grid2,.res-grid{grid-template-columns:1fr;}
+    .menu-toggle{display:inline-block!important;}
+    .topbar .who,.topbar .date{display:none;}
+  }
+  .menu-toggle{display:none;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:16px;}
+  .cover{text-align:center;padding:40px 20px;}
+  .cover h2{font-size:24px;margin-bottom:8px;}
+  ::-webkit-scrollbar{width:9px;height:9px;} ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:6px;}
+  /* 可访问性：键盘导航焦点可见 */
+  .item:focus-visible,.btn:focus-visible,.menu-toggle:focus-visible,td[style*="cursor:pointer"]:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+</style>
+<!-- 订阅门禁：样式与配置先加载，gate.js 必须在业务脚本之前同步执行 -->
+<link rel="stylesheet" href="sub/ent.css" />
+<script src="sub/config.js"></script>
+<script src="sub/gate.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="nav" id="nav">
+    <div class="logo"><h1>教师工作台</h1><p>小初高通用 · 在线订阅 · 云端同步</p></div>
+    <div class="menu" id="menu"></div>
+    <div class="help"><div class="item" data-view="帮助"><span class="ic">?</span>帮助</div></div>
+  </aside>
+  <section class="main">
+    <div class="topbar">
+      <span class="menu-toggle" role="button" tabindex="0" aria-label="打开或收起导航菜单" onclick="document.getElementById('nav').classList.toggle('open')">☰</span>
+      <select id="classSel"></select>
+      <span class="who" id="who"></span>
+      <span class="date" id="todayDate"></span>
+      <span class="save-tip">● 本机保存</span>
+    </div>
+    <div class="content" id="content"></div>
+  </section>
+</div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="fs-bg" id="fsBg"><div class="fs-bar"><span class="t" id="fsTitle">全屏演示</span>
+  <span style="font-size:11px;color:#9aa6c0">若外部站点禁止内嵌，请改用「打开资源」</span>
+  <button class="x" data-act="closeFs">✕ 退出全屏</button></div>
+  <iframe class="fs-frame" id="fsFrame" allow="fullscreen" referrerpolicy="no-referrer"></iframe></div>
+<div class="fs-bg" id="liveBg"><div class="fs-bar"><span class="t" id="liveTitle">随堂测验 · 即时正确率</span>
+  <span style="font-size:11px;color:#9aa6c0">即时统计 · 对标雨课堂 · 数据云端同步</span>
+  <button class="x" data-act="closeLive">✕ 退出大屏</button></div>
+  <div id="liveBody" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:20px;overflow:auto"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+/* ID 序列：与 Date.now() 组合保证严格单调递增、跨毫秒不碰撞（var 提升，供 load() 初始化期安全调用） */
+var __idSeq=0;
+/* ============== 学段 / 年级 / 教材版本 / 学科 模型 ============== */
+const STAGES={
+  '小学':{grades:['一年级','二年级','三年级','四年级','五年级','六年级'],
+          subjects:['语文','数学','英语','科学','道德与法治']},
+  '初中':{grades:['七年级','八年级','九年级'],
+          subjects:['语文','数学','英语','物理','化学','生物','历史','地理','道德与法治']},
+  '高中':{grades:['高一','高二','高三'],
+          subjects:['语文','数学','英语','物理','化学','生物','历史','地理','政治']},
+};
+const EDITIONS=['人教版','北师大版','苏教版','沪教版','浙教版','鲁科版','粤教版','教科版'];
+/* 学科内容画像：kp=知识点(文科) / types=题型(理科) / radar=能力维度 / res=推荐资源 */
+const SUBJECTS={
+  '语文':{kind:'arts',kp:['现代文阅读','古诗文阅读','文言文基础','写作','基础知识'],
+    radar:['阅读理解','基础知识','作文','文学鉴赏','文化自信'],
+    res:['国家中小学智慧教育平台|资源|官方备课与精品课|https://basic.smartedu.cn/',
+         '古诗文网|素材|文言文与诗词查阅|https://www.gushiwen.cn/',
+         'B站 语文检索|视频|重难点讲解|https://search.bilibili.com/all?keyword=高中语文']},
+  '数学':{kind:'sci',kp:['数与代数','图形与几何','统计与概率','综合实践'],
+    radar:['运算','几何直观','逻辑推理','数据分析','应用创新'],
+    res:['GeoGebra 动态演示|动态|函数与几何可视化|https://www.geogebra.org/',
+         '国家中小学智慧教育平台|资源|官方教材配套|https://basic.smartedu.cn/',
+         'B站 数学检索|视频|题型精讲|https://search.bilibili.com/all?keyword=高中数学']},
+  '英语':{kind:'arts',kp:['听力','词汇','语法','阅读','写作'],
+    radar:['听','说','读','写','词汇量'],
+    res:['国家中小学智慧教育平台|资源|听说资源|https://basic.smartedu.cn/',
+         'B站 英语检索|视频|语法与听力|https://search.bilibili.com/all?keyword=高中英语']},
+  '物理':{kind:'lab',types:['选择题','实验题','计算题'],
+    res:['PhET 交互仿真|仿真|法拉第电磁实验室等|https://phet.colorado.edu/zh_CN/simulations/filter?subjects=physics&type=html',
+         'GeoGebra 动态演示|动态|运动学向量演示|https://www.geogebra.org/',
+         'Phyphox 手机实验|实验|传感器实验|https://phyphox.org/',
+         '国家中小学智慧教育平台|资源|教材配套|https://basic.smartedu.cn/']},
+  '化学':{kind:'lab',types:['选择题','实验题','计算题'],
+    res:['PhET 化学仿真|仿真|分子与反应|https://phet.colorado.edu/zh_CN/simulations/filter?subjects=chemistry',
+         '虚拟实验|实验|初高中化学实验|https://www.zuoyebang.com/',
+         '国家中小学智慧教育平台|资源|教材配套|https://basic.smartedu.cn/']},
+  '生物':{kind:'lab',types:['选择题','实验题','简答题'],
+    res:['虚拟实验|实验|显微镜与解剖|https://www.zuoyebang.com/','国家平台|资源|https://basic.smartedu.cn/']},
+  '历史':{kind:'arts',kp:['中国古代史','中国近现代史','世界史'],
+    radar:['时空观念','史料实证','历史解释','家国情怀'],
+    res:['国家中小学智慧教育平台|资源|https://basic.smartedu.cn/','B站 历史|视频|https://search.bilibili.com/all?keyword=高中历史']},
+  '地理':{kind:'arts',kp:['自然地理','人文地理','区域地理'],
+    radar:['读图能力','空间思维','综合分析'],
+    res:['Google Earth|工具|地形与卫星|https://earth.google.com/', '国家平台|资源|https://basic.smartedu.cn/']},
+  '政治':{kind:'arts',kp:['心理健康','道德','法治','国情'],
+    radar:['认知','认同','践行'],
+    res:['国家中小学智慧教育平台|资源|https://basic.smartedu.cn/']},
+  '道德与法治':{kind:'arts',kp:['心理健康','道德','法治','国情'],
+    radar:['认知','认同','践行'],
+    res:['国家中小学智慧教育平台|资源|https://basic.smartedu.cn/']},
+  '科学':{kind:'lab',types:['选择题','实验题','探究题'],
+    res:['PhET 交互仿真|仿真|https://phet.colorado.edu/zh_CN/','国家平台|资源|https://basic.smartedu.cn/']},
+  '_default':{kind:'sci',types:['选择题','填空题','解答题'],
+    res:['国家中小学智慧教育平台|资源|https://basic.smartedu.cn/','B站检索|视频|https://search.bilibili.com/all?keyword=学科']},
+};
+
+/* 知识点/公式 真值库：按 学科 -> 学段 -> [{title,body}] 组织，严格对应现行课程标准（2022 义务教育/高中课标）
+   理科(数学物理化学生物)以公式与定理为主，文科以核心知识点为主；知识点内置在应用代码中，登录后由云端权限校验放行 */
+const KNOWLEDGE={
+  '语文':{
+    '小学':[
+      {title:'汉语拼音',body:'声母23个、韵母24个、整体认读音节16个；声调分阴平、阳平、上声、去声；ü 与 j/q/x 相拼省两点。'},
+      {title:'识字与写字',body:'累计认识常用汉字约3000个、会写约2500个；掌握基本笔画、笔顺规则与间架结构。'},
+      {title:'词语积累',body:'近义词、反义词辨析；常用成语意思与用法；词语搭配（偏正、动宾）。'},
+      {title:'句子训练',body:'把字句与被字句互换；扩句与缩句；常见修辞（比喻、拟人）初步。'},
+      {title:'阅读',body:'学习默读与朗读；联系上下文理解词句意思；概括自然段大意。'},
+      {title:'习作',body:'看图写话；写清时间、地点、人物、事件的记叙要素。'}
+    ],
+    '初中':[
+      {title:'现代文阅读',body:'记叙文六要素（时间、地点、人物、起因、经过、结果）；说明文说明方法与顺序；议论文三要素（论点、论据、论证）。'},
+      {title:'古诗文',body:'常见文言实词与虚词（之、乎、者、也、而、以）；判断句与倒装句；诗词意象与情感鉴赏。'},
+      {title:'名著阅读',body:'《朝花夕拾》《西游记》《骆驼祥子》《红星照耀中国》等整本书阅读与人物分析。'},
+      {title:'写作',body:'记叙文线索与详略；说明文特征；简单议论文；应用文（书信、通知、倡议书）。'},
+      {title:'基础知识',body:'病句类型（搭配不当、成分残缺、语序不当）；标点用法；修辞（比喻、拟人、排比、对偶、设问、反问）。'}
+    ],
+    '高中':[
+      {title:'现代文阅读',body:'论述类文本（论点、论据、论证结构）；实用类文本（新闻、传记、科普）；文学类文本（小说、散文）形象、语言、技巧。'},
+      {title:'古诗文',body:'18个常见文言虚词；词类活用与特殊句式；诗歌鉴赏（意境、手法、情感）；背诵推荐篇目。'},
+      {title:'写作',body:'议论文立论与论证（举例、对比、比喻、引用）；思辨性表达；任务驱动型作文。'},
+      {title:'整本书阅读',body:'《乡土中国》《红楼梦》等研读；跨媒介阅读与交流。'}
+    ]
+  },
+  '数学':{
+    '小学':[
+      {title:'四则运算',body:'加法交换律 a+b=b+a；乘法交换律 a×b=b×a、结合律 (a×b)×c=a×(b×c)、分配律 a(b+c)=ab+ac。'},
+      {title:'小数与分数',body:'小数加减对齐数位；分数乘法 a/b×c/d=ac/bd；分数除法 a/b÷c/d=a/b×d/c；分数、小数、百分数互化。'},
+      {title:'比和比例',body:'比的基本性质；比例基本性质（内项积=外项积）；正比例 y/x=k、反比例 xy=k。'},
+      {title:'平面图形',body:'长方形 S=ab、C=2(a+b)；正方形 S=a²；平行四边形 S=ah；三角形 S=ah/2；梯形 S=(a+b)h/2；圆 C=2πr、S=πr²。'},
+      {title:'立体图形',body:'长方体 V=abh；正方体 V=a³；圆柱 V=Sh=πr²h；圆锥 V=1/3 Sh=1/3πr²h。'},
+      {title:'统计',body:'平均数、中位数、众数；条形与折线统计图。'}
+    ],
+    '初中':[
+      {title:'实数',body:'平方根与算术平方根；立方根；二次根式 √a·√b=√(ab)(a,b≥0)；有理数与无理数。'},
+      {title:'方程',body:'一元一次方程；二元一次方程组；一元二次方程求根公式 x=[-b±√(b²-4ac)]/(2a)，判别式 Δ=b²-4ac。'},
+      {title:'函数',body:'一次函数 y=kx+b(k≠0)；反比例函数 y=k/x；二次函数 y=ax²+bx+c，顶点(-b/2a,(4ac-b²)/4a)。'},
+      {title:'三角形',body:'内角和180°；勾股定理 a²+b²=c²；全等判定 SSS、SAS、ASA、AAS、HL。'},
+      {title:'四边形',body:'平行四边形、矩形、菱形、正方形性质与判定；梯形中位线=(上底+下底)/2。'},
+      {title:'圆',body:'圆周角定理（同弧圆周角=圆心角一半）；弧长 l=nπr/180；扇形 S=nπr²/360。'},
+      {title:'概率统计',body:'方差 s²=1/n Σ(xi-x̄)²；概率 P(A)=m/n。'}
+    ],
+    '高中':[
+      {title:'集合与函数',body:'集合并交补；函数单调性与奇偶性；指数律 a^m·a^n=a^(m+n)；对数律 log_a(MN)=log_aM+log_aN，换底公式 log_a b=ln b/ln a。'},
+      {title:'三角函数',body:'sin²α+cos²α=1；和差角公式；二倍角；正弦定理 a/sinA=2R；余弦定理 c²=a²+b²-2ab cosC。'},
+      {title:'数列',body:'等差 a_n=a_1+(n-1)d，S_n=n(a_1+a_n)/2；等比 a_n=a_1 q^(n-1)，S_n=a_1(1-q^n)/(1-q)。'},
+      {title:'平面向量',body:'数量积 a·b=|a||b|cosθ；坐标运算与模长。'},
+      {title:'立体几何',body:'柱、锥、台、球体积与表面积；空间向量求角与距离。'},
+      {title:'解析几何',body:'直线斜率 k=(y2-y1)/(x2-x1)；圆、椭圆、双曲线、抛物线标准方程。'},
+      {title:'导数',body:'(x^n)\'=nx^(n-1)，(e^x)\'=e^x，(ln x)\'=1/x；导数与单调性、极值。'},
+      {title:'概率统计',body:'排列 A_n^m、组合 C_n^m；二项分布、正态分布；线性回归。'}
+    ]
+  },
+  '英语':{
+    '小学':[
+      {title:'字母语音',body:'26个字母大小写；5个元音字母 a,e,i,o,u；自然拼读基本规则。'},
+      {title:'词汇',body:'话题词（颜色、数字、家庭、动物、食物、学校、天气、季节）。'},
+      {title:'基本句型',body:'be 动词 am/is/are；I like… / I can… / This is… / What colour…? / How many…?'},
+      {title:'语法初步',body:'名词单复数加 -s/-es；人称代词 I/you/he/she/we/they；一般现在时。'},
+      {title:'交际用语',body:'问候、介绍、感谢、请求许可等日常表达。'}
+    ],
+    '初中':[
+      {title:'时态',body:'一般现在时、一般过去时、一般将来时(will/be going to)、现在进行时、现在完成时(have/has+done)。'},
+      {title:'词法',body:'名词（可数/不可数、所有格）；代词（人称、物主、不定）；形容词/副词比较级与最高级；介词与冠词。'},
+      {title:'句法',body:'陈述、疑问、祈使、感叹句；宾语从句（陈述语序、时态呼应）；状语从句（when/if 等）；被动语态 be+done。'},
+      {title:'阅读写作',body:'略读与寻读；书面表达（日记、邮件、记叙/说明短文）。'}
+    ],
+    '高中':[
+      {title:'时态语态',body:'各基础时态 + 过去完成时、将来进行时等；被动语态各时态。'},
+      {title:'非谓语动词',body:'不定式 to do、动名词 doing、分词 done/doing 作主语/宾语/定语/状语/补语。'},
+      {title:'复合句',body:'定语从句（who/which/that/whom/whose/when/where/why）；名词性从句；状语从句。'},
+      {title:'虚拟语气',body:'if 条件句（与现在/过去/将来事实相反）；wish 从句。'},
+      {title:'词汇语用',body:'构词法（前缀、后缀、合成）；读后续写与议论文写作。'}
+    ]
+  },
+  '物理':{
+    '初中':[
+      {title:'运动与力',body:'速度 v=s/t；二力平衡条件；牛顿第一定律（惯性）；摩擦力。'},
+      {title:'压强与浮力',body:'固体压强 p=F/S；液体压强 p=ρgh；阿基米德原理 F浮=ρ液gV排；大气压强。'},
+      {title:'机械与功',body:'功 W=Fs；功率 P=W/t；机械效率 η=W有/W总；杠杆平衡 F1 l1=F2 l2。'},
+      {title:'热学',body:'温度与内能；比热容 Q=cmΔt；热值；热机。'},
+      {title:'电学',body:'欧姆定律 I=U/R；电功 W=UIt；电功率 P=UI；焦耳定律 Q=I²Rt；串并联特点。'},
+      {title:'光学声学',body:'光的反射与折射；凸透镜成像；声音由振动产生、空气中声速约340 m/s。'}
+    ],
+    '高中':[
+      {title:'运动学',body:'匀变速 v=v0+at，s=v0t+½at²，v²-v0²=2as；自由落体；平抛运动。'},
+      {title:'力学',body:'牛顿第二定律 F=ma；共点力平衡；万有引力 F=Gm1m2/r²；向心力 F=mv²/r。'},
+      {title:'功与能',body:'动能 Ek=½mv²；重力势能 Ep=mgh；动能定理 W=ΔEk；机械能守恒。'},
+      {title:'动量',body:'p=mv；动量定理；动量守恒（系统合外力为零）。'},
+      {title:'电场',body:'库仑定律 F=k q1q2/r²；电场强度 E=F/q；电势差 U=W/q；电容 C=Q/U。'},
+      {title:'磁场与电磁感应',body:'安培力 F=BIL；洛伦兹力 f=qvB；法拉第定律 E=nΔΦ/Δt；楞次定律。'},
+      {title:'振动波光原子',body:'简谐运动；波速 v=λf；折射率 n=c/v；光电效应；原子能级。'}
+    ]
+  },
+  '化学':{
+    '初中':[
+      {title:'物质构成',body:'分子、原子、离子；元素与化合价；化学式书写。'},
+      {title:'空气与氧气',body:'空气中氧气约21%；氧气制取 2H2O2 =(MnO2)= 2H2O+O2↑；质量守恒定律。'},
+      {title:'水与溶液',body:'电解水 2H2O 通电 2H2↑+O2↑；溶解度；溶质质量分数=溶质/溶液×100%。'},
+      {title:'碳及氧化物',body:'CO2 制取 CaCO3+2HCl=CaCl2+H2O+CO2↑；CO2 性质与温室效应。'},
+      {title:'金属酸碱盐',body:'金属活动性顺序；常见酸(HCl、H2SO4)与碱(NaOH、Ca(OH)2)；中和反应；复分解条件；pH。'},
+      {title:'化学计算',body:'根据化学方程式计算；溶质质量分数计算。'}
+    ],
+    '高中':[
+      {title:'物质的量',body:'n=N/N_A=m/M=V/V_m；气体摩尔体积 V_m≈22.4 L/mol（标准状况）。'},
+      {title:'物质结构',body:'原子电子排布；元素周期律；离子键与共价键；晶体类型。'},
+      {title:'反应原理',body:'氧化还原（化合价升降、电子转移）；原电池与电解池；化学平衡与速率；电离平衡；盐类水解。'},
+      {title:'无机物',body:'钠、铝、铁、铜及其化合物；氯、硫、氮、硅及其化合物。'},
+      {title:'有机化学',body:'烷烯炔与芳香烃；官能团（羟基、醛基、羧基、酯基）；同分异构；取代/加成/消去/酯化反应。'},
+      {title:'化学实验',body:'常见仪器与操作；物质分离提纯；离子检验。'}
+    ]
+  },
+  '生物':{
+    '初中':[
+      {title:'细胞',body:'动植物细胞结构（膜、质、核、线粒体、叶绿体）；细胞分裂；单细胞生物。'},
+      {title:'生物与环境',body:'生态系统（生产者、消费者、分解者）；食物链与食物网；生态平衡。'},
+      {title:'植物',body:'种子萌发条件；光合作用 6CO2+6H2O →(光/叶绿体) C6H12O6+6O2；呼吸作用；蒸腾作用。'},
+      {title:'人体',body:'消化、呼吸（气体交换）、循环（血液与心脏）、泌尿、神经系统；免疫。'},
+      {title:'遗传进化',body:'基因、DNA、染色体关系；显性隐性；变异与进化。'}
+    ],
+    '高中':[
+      {title:'分子与细胞',body:'细胞结构与功能；酶的特性；ATP；光合作用（光反应、暗反应）；细胞呼吸（有氧、无氧）。'},
+      {title:'遗传进化',body:'减数分裂；分离定律与自由组合定律；伴性遗传；DNA 复制；中心法则；现代生物进化理论（基因频率）。'},
+      {title:'稳态环境',body:'内环境稳态；神经—体液—免疫调节；植物激素（生长素）；生态系统能量流动与物质循环。'},
+      {title:'生物技术',body:'发酵工程；基因工程；细胞工程基础。'}
+    ]
+  },
+  '历史':{
+    '初中':[
+      {title:'中国古代史',body:'先秦（夏商周、分封制、百家争鸣）；秦汉大一统；隋唐繁荣；宋元；明清君主集权与闭关锁国。'},
+      {title:'中国近现代史',body:'鸦片战争；洋务运动、戊戌变法；辛亥革命；新文化运动；新民主主义革命；抗日战争；解放战争；新中国成立。'},
+      {title:'世界史',body:'文艺复兴与新航路；英、法、美资产阶级革命；工业革命；两次世界大战；冷战格局。'}
+    ],
+    '高中':[
+      {title:'中国古代',body:'中央集权制度演进；选官制度（察举、科举）；小农经济；儒家思想的演变。'},
+      {title:'中国近现代',body:'近代化探索；新民主主义革命；改革开放与社会主义建设。'},
+      {title:'世界史',body:'资本主义世界市场形成；西方民主政治；科学社会主义；20世纪战争与和平；文化遗产。'}
+    ]
+  },
+  '地理':{
+    '初中':[
+      {title:'地球地图',body:'经纬网定位；地球自转与公转；等高线地形图判读。'},
+      {title:'世界地理',body:'大洲大洋；主要气候类型；人口与聚落。'},
+      {title:'中国地理',body:'三级阶梯地势；季风气候显著；长江与黄河；自然资源；农业、工业与交通。'}
+    ],
+    '高中':[
+      {title:'自然地理',body:'地球运动（正午太阳高度、昼夜长短）；气压带风带与天气系统；水循环；地壳物质循环；地域分异规律。'},
+      {title:'人文地理',body:'人口与城市化；农业区位；工业区位；交通与可持续发展。'},
+      {title:'区域地理',body:'中国与世界区域可持续发展；地理信息技术（RS、GPS、GIS）。'}
+    ]
+  },
+  '政治':{
+    '高中':[
+      {title:'中国特色社会主义',body:'道路、理论、制度、文化；新时代主要矛盾。'},
+      {title:'经济与社会',body:'社会主义市场经济体制；收入分配与共同富裕；高质量发展。'},
+      {title:'政治与法治',body:'人民当家作主；全面依法治国；党的领导制度体系。'},
+      {title:'哲学与文化',body:'唯物论、辩证法、认识论、历史唯物主义；中华优秀传统文化创造性转化。'},
+      {title:'选择性必修',body:'当代国际政治与经济；法律与生活；逻辑与思维。'}
+    ]
+  },
+  '道德与法治':{
+    '小学':[
+      {title:'自我与家庭',body:'健康生活与自我保护；家庭责任与沟通。'},
+      {title:'学校与规则',body:'学校生活规则；同学友谊与尊重。'},
+      {title:'社会与法治',body:'爱护环境；初步法治观念（规则、安全、权利）。'}
+    ],
+    '初中':[
+      {title:'成长中的我',body:'青春期、情绪、挫折、生命价值。'},
+      {title:'他人与集体',body:'友谊、师生、亲子；集体与责任；违法与犯罪。'},
+      {title:'国家与社会',body:'基本国情与改革开放；宪法；权利与义务；生态文明；民族团结。'}
+    ]
+  },
+  '科学':{
+    '小学':[
+      {title:'物质科学',body:'物体三态；力与运动；简单机械；声、光、电、磁现象。'},
+      {title:'生命科学',body:'植物与动物的特征；人体主要器官；生命活动。'},
+      {title:'地球宇宙',body:'地球、太阳、月球；天气与季节；岩石与土壤。'},
+      {title:'技术工程',body:'简单设计与制作；材料与工具。'}
+    ]
+  }
+};
+// 取某学科某学段的知识点/公式；道德与法治、科学、政治按键名直接命中，其余缺省回退政治
+/* 政治仅在高中开设；小学/初中对应科目名为「道德与法治」，做学段自适应映射，
+ * 避免教师选「政治 + 小学/初中」或存量数据错配时知识点库空白（B2 健壮性） */
+function knOf(subject,stage){
+  let s=subject;
+  if(s==='政治'&&stage!=='高中')s='道德与法治';
+  else if(s==='道德与法治'&&stage==='高中')s='政治';
+  const m=KNOWLEDGE[s]||KNOWLEDGE['政治'];
+  return (m&&m[stage])?m[stage]:[];
+}
+/* ============== 学科注册表（可扩展性）：统一 STAGES / SUBJECTS / KNOWLEDGE 三处数据的扩展入口 ============== */
+/* 新增学科只需一次 registerSubject 调用（学段年级 + 学科画像 + 知识库一次配齐），全站自动生效：
+   registerSubject('信息技术',{stages:{'高中':['高一','高二','高三']},
+     profile:{kind:'lab',types:['选择题','操作题','解答题'],res:['…|资源|…|https://…']},
+     knowledge:{'高中':[{title:'…',body:'…'}]}}); */
+const SUBJECT_REGISTRY={};
+function registerSubject(name,cfg){
+  SUBJECT_REGISTRY[name]=cfg;
+  Object.keys(cfg.stages||{}).forEach(st=>{
+    if(!STAGES[st])STAGES[st]={grades:[],subjects:[]};
+    if(!STAGES[st].subjects.includes(name))STAGES[st].subjects.push(name);
+    if(cfg.stages[st]&&cfg.stages[st].length)STAGES[st].grades=cfg.stages[st];
+  });
+  if(cfg.profile)SUBJECTS[name]=cfg.profile;
+  if(cfg.knowledge)KNOWLEDGE[name]=cfg.knowledge;
+  return SUBJECT_REGISTRY[name];
+}
+/* 用内置学科自动填充注册表（保持与现有数据兼容） */
+Object.keys(SUBJECTS).forEach(n=>{if(n!=='_default')SUBJECT_REGISTRY[n]={profile:SUBJECTS[n],stages:Object.keys(KNOWLEDGE[n]||{})};});
+
+/* ============== 数据层 ============== */
+const KEY='universal_teacher_workbench_v1';
+/* schema 版本：数据结构变更时递增，load() 按版本迁移旧数据 */
+const SCHEMA_VERSION=2;
+/* 数值安全转换：非有限数值回退默认值，防止 NaN 污染统计 */
+function num(v,def){const n=Number(v);return isFinite(n)?n:(def||0);}
+const NAMES=['王子航','李雨桐','陈思源','张子涵','王浩然','刘梓萱','赵明轩','孙佳怡','周俊杰','吴梦琪'];
+function defaultData(){
+  const c=makeClass({name:'初一(3)班',stage:'初中',grade:'七年级',subject:'语文',edition:'人教版'});
+  return {schemaVersion:SCHEMA_VERSION,currentClassId:c.id,classes:[c],trash:[],
+    aiConfig:{enabled:false,endpoint:'',key:'',model:''},sync:{mode:'local',url:'',user:''}};
+}
+function profOf(subject){return SUBJECTS[subject]||SUBJECTS['_default'];}
+function makeClass(o){
+  const prof=profOf(o.subject); const id=uid();
+  const students=NAMES.slice(0,8).map((nm,i)=>({id:uid(),sid:String(i+1).padStart(2,'0'),name:nm}));
+  const base=76+Math.random()*8; const exams=[];
+  for(let k=0;k<4;k++){
+    const scores=students.map((s,i)=>{const v=Math.round(base+k*2.4+(i%3)*3-(i>5?7:0)+(Math.random()*6-3));return {name:s.name,total:Math.max(38,Math.min(100,v)),full:100};});
+    const avg=(scores.reduce((a,b)=>a+b.total,0)/scores.length).toFixed(1);
+    exams.push({name:`第${k+1}次测评`,date:`2026-0${9+k}-1${k}`,avg:+avg,scores});
+  }
+  const isLab=!!prof.types;
+  const kn=knOf(o.subject,o.stage);
+  const kpTitles=(!isLab&&kn.length)?kn.slice(0,6).map(e=>e.title):(prof.kp||[]);
+  const kp=kpTitles.map(p=>({name:p,rate:Math.round(64+Math.random()*32)}));
+  const types=prof.types?prof.types.map(t=>({name:t,rate:Math.round(60+Math.random()*34)})):[];
+  const radar=prof.radar?prof.radar.map(d=>({name:d,val:Math.round(60+Math.random()*34)})):[];
+  const last=exams[exams.length-1];
+  const warnings=last.scores.filter(s=>s.total<60).map(s=>({name:s.name,score:s.total,reason:s.total<48?'基础薄弱，需重点关注':'近期波动，建议个别辅导'}));
+  const resources=(prof.res||[]).map(r=>{const a=r.split('|');return {id:uid(),name:a[0],tag:a[1]||'资源',desc:a[2]||'',url:a[3]||'#'};});
+  const knowledge=kn.length?kn.slice(0,10).map(e=>({title:e.title,body:e.body}))
+    :[{title:o.subject+' 核心内容',body:'（示例）在知识点库补充 '+o.subject+' 的核心公式/定理/要点。'}];
+  /* 轻量排课：个人周课表（可编辑）+ 调代课记录（V2-3） */
+  const timetable=[['','第一节','第二节','第三节','第四节','第五节','第六节'],
+    ['周一',o.subject,'','','','',''],['周二','','',o.subject,'','',''],['周三','','','','','',''],
+    ['周四',o.subject,'','','','',''],['周五','','',o.subject,'','','']];
+  const subst=[];
+  /* 题库：智能批改与随堂测验共用（V2-1 / V2-5） */
+  const quizzes=sampleQuiz(o.subject);
+  /* 错题本：由本次预警学生自动沉淀典型错题（共性薄弱点的线索） */
+  const mistakes=warnings.map(w=>({id:uid(),subj:o.subject,
+    q:o.subject+' 典型易错题（'+(prof.kp?w.reason:'薄弱题型')+'）',
+    reason:w.reason,fix:'对应知识点巩固 + 同类变式 3 题',rate:Math.round(38+Math.random()*28)}));
+  return {id,name:o.name,stage:o.stage,grade:o.grade,subject:o.subject,edition:o.edition,
+    students,exams,kp,types,radar,warnings,resources,knowledge,timetable,subst,quizzes,
+    homework:[{id:uid(),title:o.subject+' 课后练习 P'+(10+Math.floor(Math.random()*20)),cls:o.subject,status:'未完成',layer:'全员',attachments:[]}],
+    prep:[{id:uid(),title:o.subject+' 第1章 备课',cls:o.subject,status:'草稿',tpl:'',attachments:[]}],
+    research:[],family:[],mistakes};
+}
+/* 默认课表（旧数据兼容） */
+function defaultTimetable(k){const s=k.subject;return [['','第一节','第二节','第三节','第四节','第五节','第六节'],
+  ['周一',s,'','','','',''],['周二','','',s,'','',''],['周三','','','','','',''],
+  ['周四',s,'','','','',''],['周五','','',s,'','','']];}
+/* 示例题库（客观题：选择/填空），供智能批改与随堂测验开箱即用；按学科内置贴近教材的真实题目 */
+function sampleQuiz(subject){
+  const bank={
+    '语文':[{q:'“学而不思则罔”的下一句是？',type:'blank',key:'思而不学则殆'},{q:'《背影》的作者是？',type:'choice',options:['A. 朱自清','B. 鲁迅','C. 老舍','D. 巴金'],key:'A'}],
+    '数学':[{q:'一元二次方程 x²-3x+2=0 的较小根是？',type:'blank',key:'1'},{q:'函数 y=2x+1 的图像是？',type:'choice',options:['A. 抛物线','B. 直线','C. 双曲线','D. 圆'],key:'B'}],
+    '英语':[{q:'I ____ (go) to school yesterday.（用所给词的正确形式填空）',type:'blank',key:'went'},{q:'“book”的复数形式是？',type:'choice',options:['A. bookes','B. books','C. bookies','D. book'],key:'B'}],
+    '物理':[{q:'真空中光的传播速度约为多少 m/s？',type:'blank',key:'3×10^8'},{q:'牛顿第二定律的表达式是？',type:'choice',options:['A. F=ma','B. E=mc²','C. W=Fs','D. P=W/t'],key:'A'}],
+    '化学':[{q:'水的化学式是？',type:'blank',key:'H2O'},{q:'空气中体积分数最大的气体是？',type:'choice',options:['A. 氧气','B. 二氧化碳','C. 氮气','D. 稀有气体'],key:'C'}],
+    '生物':[{q:'绿色植物进行光合作用的主要器官是？',type:'blank',key:'叶（叶片）'},{q:'细胞中控制遗传的结构是？',type:'choice',options:['A. 细胞膜','B. 细胞核','C. 液泡','D. 细胞壁'],key:'B'}],
+    '历史':[{q:'中国历史上第一个统一的中央集权王朝是？',type:'blank',key:'秦朝'},{q:'鸦片战争爆发于哪一年？',type:'choice',options:['A. 1839年','B. 1840年','C. 1856年','D. 1894年'],key:'B'}],
+    '地理':[{q:'地球自转一周的时间约为多少小时？',type:'blank',key:'24'},{q:'世界面积最大的大洋是？',type:'choice',options:['A. 大西洋','B. 印度洋','C. 太平洋','D. 北冰洋'],key:'C'}],
+    '政治':[{q:'我国的根本政治制度是？',type:'blank',key:'人民代表大会制度'},{q:'我国最高国家权力机关是？',type:'choice',options:['A. 国务院','B. 全国人民代表大会','C. 最高人民法院','D. 中央军委'],key:'B'}],
+    '道德与法治':[{q:'我国的国旗是？',type:'blank',key:'五星红旗'},{q:'发现火情应拨打的报警电话是？',type:'choice',options:['A. 110','B. 120','C. 119','D. 122'],key:'C'}],
+    '科学':[{q:'水结成冰属于哪种变化？',type:'choice',options:['A. 化学变化','B. 物理变化','C. 生物变化','D. 没有变化'],key:'B'},{q:'声音是由物体的______产生的。',type:'blank',key:'振动'}],
+  };
+  const qs=bank[subject]||[{q:subject+' 基础概念判断（示例）',type:'choice',options:['A. 正确','B. 错误'],key:'A'},{q:subject+' 基础知识填空（示例）',type:'blank',key:'示例答案'}];
+  return [{id:uid(),title:subject+' 随堂小测（示例）',subject,questions:qs}];}
+/* ---- 归一化层：所有数据入口（启动 / 迁移 / 导入恢复）统一经过，杜绝脏数据导致的视图崩溃 ---- */
+const BACKUP_KEY=KEY+'_bak';
+const CORRUPT_KEY='universal_teacher_workbench_corrupt_';
+/* 数组内 id 去重：缺 id / 重复 id 统一重新分配，避免删除、编辑、切换错对象 */
+function dedupeIds(arr){const seen=new Set();arr.forEach(x=>{if(!x||typeof x!=='object')return;
+  const id=Number(x.id);if(!isFinite(id)||id===0||seen.has(id)){x.id=uid();seen.add(x.id);}else{x.id=id;seen.add(id);}});}
+/* D01/D03/D12/D23：统一归一化入口，补齐 15 类数组字段、唯一 id、清洗数值 */
+function normalizeClass(c){
+  if(!c||typeof c!=='object')c={};
+  if(!Number(c.id))c.id=uid();
+  c.name=String(c.name||'未命名班级');c.stage=String(c.stage||'小学');c.grade=String(c.grade||'一年级');
+  c.subject=String(c.subject||'语文');c.edition=String(c.edition||'人教版');
+  ['students','exams','kp','types','radar','warnings','resources','knowledge','subst','quizzes','homework','prep','research','family','mistakes']
+    .forEach(k=>{if(!Array.isArray(c[k]))c[k]=[];});
+  if(!Array.isArray(c.timetable)||!c.timetable.length)c.timetable=defaultTimetable(c);
+  if(!c.exams.length)c.exams.push({name:'第1次测评',date:new Date().toISOString().slice(0,10),avg:0,scores:[]});
+  c.exams.forEach(e=>{if(!e||typeof e!=='object')return;e.name=String(e.name||'测评');e.avg=num(e.avg,0);
+    if(!Array.isArray(e.scores))e.scores=[];
+    e.scores.forEach(s=>{s.total=num(s.total,0);s.full=num(s.full,100)||100;});});
+  ['kp','types'].forEach(k=>c[k].forEach(p=>{p.name=String(p.name||'—');p.rate=num(p.rate,0);}));
+  c.radar.forEach(r=>{r.name=String(r.name||'—');r.val=num(r.val,0);});
+  c.mistakes.forEach(m=>{m.rate=num(m.rate,0);});
+  c.quizzes.forEach(q=>{if(!q||typeof q!=='object')return;if(!Array.isArray(q.questions))q.questions=[];q.title=String(q.title||'未命名测验');});
+  /* 附件：旧版本记录无 attachments 字段，统一补齐为 []，保证三条入口（启动/迁移/导入恢复）一致 */
+  ['homework','prep','research'].forEach(k=>c[k].forEach(r=>{if(r&&typeof r==='object'&&!Array.isArray(r.attachments))r.attachments=[];}));
+  ['students','quizzes','homework','prep','research','family','mistakes','resources','subst'].forEach(k=>dedupeIds(c[k]));
+  return c;
+}
+/* 回收站 30 天清理：纯函数，作用于「正在加载的数据」而非全局 DB（修复此前清理目标错误 + TDZ） */
+function purgeTrash(list){const NOW=Date.now(),D30=30*24*3600*1000;
+  return (Array.isArray(list)?list:[]).filter(t=>t&&t.data&&NOW-num(t.deletedAt,0)<D30);}
+/* D01/D02/D03/D15：校验 classes + 全局字段 + 回收站清理作用于入参；校验失败返回 null */
+function normalizeDB(d){
+  if(!d||typeof d!=='object'||!Array.isArray(d.classes)||!d.classes.length)return null;
+  if(!d.aiConfig||typeof d.aiConfig!=='object')d.aiConfig={enabled:false,endpoint:'',key:'',model:''};
+  if(!d.sync||typeof d.sync!=='object')d.sync={mode:'local',url:'',user:''};
+  d.classes=d.classes.filter(Boolean).map(normalizeClass);
+  if(!d.classes.length)return null;
+  dedupeIds(d.classes);
+  d.trash=purgeTrash(d.trash);
+  const cid=Number(d.currentClassId);
+  d.currentClassId=d.classes.some(c=>c.id===cid)?cid:d.classes[0].id;
+  d.schemaVersion=SCHEMA_VERSION;
+  return d;
+}
+function safeGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+let DB=load();
+/* D01/D02/D29：消除初始化期 TDZ；解析失败先留档再从滚动备份恢复，绝不静默覆盖；迁移判定用原版本号 */
+function load(){
+  const raw=safeGet(KEY);
+  if(raw){
+    try{
+      const parsed=JSON.parse(raw);
+      const oldV=num(parsed.schemaVersion,1); /* 归一化会改写版本号，迁移判定须用原值 */
+      const d=normalizeDB(parsed);
+      if(d){if(oldV<SCHEMA_VERSION)save(d);return d;}
+      throw new Error('数据结构不完整（classes 缺失或为空）');
+    }catch(e){
+      /* 绝不直接覆盖原始数据：先留档，再尝试滚动备份恢复 */
+      try{localStorage.setItem(CORRUPT_KEY+Date.now(),raw);}catch(_){}
+      const bak=safeGet(BACKUP_KEY);
+      if(bak){try{const d=normalizeDB(JSON.parse(bak));if(d){handleErr('主数据读取失败，已自动从上一份备份恢复');save(d);return d;}}catch(_){}}
+      handleErr('读取本地数据失败，已保留原始副本并启用初始数据：'+(e.message||e));
+    }
+  }
+  const d=normalizeDB(defaultData())||defaultData();save(d);return d;
+}
+/* 保存策略：显式传参（迁移/导入/初始化）立即落盘；常规变更 300ms 防抖合并写盘，
+   降低大数据量下频繁全量序列化的开销；页面关闭/切后台时强制落盘防丢失。
+   注意：saveTimer 用 var 以便脚本顶部的 load() 初始化时即可安全调用 save()（避免 TDZ） */
+var saveTimer=null;
+/* D02：滚动保留上一份结构有效的数据，供主数据损坏时自动恢复 */
+function writeStorage(payload){try{const text=JSON.stringify(payload);
+  /* 滚动保留上一份有效数据：主数据损坏时 load() 可自动回退恢复，避免不可逆丢失 */
+  /* 仅当上一份是结构有效的数据才作为备份，避免「从备份恢复」时把损坏原文写成新备份 */
+  try{const prev=localStorage.getItem(KEY);if(prev&&prev!==text){const p=JSON.parse(prev);if(p&&Array.isArray(p.classes))localStorage.setItem(BACKUP_KEY,prev);}}catch(_){}
+  localStorage.setItem(KEY,text);
+  /* 在线版：每次落盘后防抖推送腾讯云；云端回填时由 __ENT_SUSPEND_SYNC__ 抑制回环 */
+  try{if(window.ENT_SYNC&&!window.__ENT_SUSPEND_SYNC__)window.ENT_SYNC.push(text);}catch(_){}
+}catch(e){const m=e&&e.name==='QuotaExceededError'?'本机缓存空间不足，请清理部分附件后重试。':'保存失败：'+(e&&e.message||e);handleErr(m);}}
+function save(d){if(d!==undefined){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;}writeStorage(d);return;}
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{saveTimer=null;writeStorage(DB);},300);}
+window.addEventListener('beforeunload',()=>{if(saveTimer){clearTimeout(saveTimer);saveTimer=null;writeStorage(DB);}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&saveTimer){clearTimeout(saveTimer);saveTimer=null;writeStorage(DB);}});
+function handleErr(msg){console.error('[教师工作台]',msg);let t=document.getElementById('errToast');if(!t){t=document.createElement('div');t.id='errToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:9999;max-width:90%;box-shadow:0 4px 12px rgba(0,0,0,.2)';document.body.appendChild(t);}t.textContent='⚠ '+msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>{if(t)t.style.display='none';},4200);}
+/* D13：classes 为空时自愈，避免 render 解引用崩溃 */
+function cur(){if(!Array.isArray(DB.classes)||!DB.classes.length){DB.classes=[normalizeClass(defaultData().classes[0])];DB.currentClassId=DB.classes[0].id;}
+  return DB.classes.find(c=>c.id===DB.currentClassId)||DB.classes[0];}
+
+/* ============== 导航 ============== */
+/* 信息架构：以教师真实工作流「备-教-改-辅-考-研-管」为主线，叠加资源与个人发展 */
+/* 声明式视图注册表：新增模块只需在此加一条 {name,icon,group,render}，导航与路由自动生效 */
+const VIEWS=[
+  {name:'总览',icon:'▦',group:'工作台',render:viewOverview},
+  {name:'备课中心',icon:'✎',group:'备课 · 上课（备/教）',render:viewPrep},
+  {name:'教学课表',icon:'▤',group:'备课 · 上课（备/教）',render:viewTimetable},
+  {name:'课堂互动',icon:'✦',group:'备课 · 上课（备/教）',render:viewInteraction},
+  {name:'作业中心',icon:'✓',group:'作业 · 考试（改/考）',render:viewHomework},
+  {name:'智能批改',icon:'🤖',group:'作业 · 考试（改/考）',render:viewGrading},
+  {name:'学情分析',icon:'📊',group:'作业 · 考试（改/考）',render:viewAnalytics},
+  {name:'教学教研',icon:'♢',group:'教研 · 学生（研/辅）',render:viewResearch},
+  {name:'学生成长',icon:'☺',group:'教研 · 学生（研/辅）',render:viewStudents},
+  {name:'班级设置',icon:'⚙',group:'班级 · 家校（管）',render:viewClassSettings},
+  {name:'家校沟通',icon:'✉',group:'班级 · 家校（管）',render:viewFamily},
+  {name:'知识点库',icon:'∑',group:'资源中心',render:viewKnowledge},
+  {name:'资源库',icon:'🔗',group:'资源中心',render:viewResources},
+  {name:'AI助手',icon:'🤖',group:'个人',render:viewAI},
+  {name:'数据同步',icon:'☁',group:'个人',render:viewSync},
+  {name:'帮助',icon:'?',group:'个人',render:viewHelp},
+];
+/* 导航分组由 VIEWS 自动派生（保持声明顺序） */
+const NAV=(()=>{const out=[],idx={};VIEWS.forEach(v=>{if(idx[v.group]===undefined){idx[v.group]=out.length;out.push({g:v.group,items:[]});}out[idx[v.group]].items.push([v.name,v.icon]);});return out;})();
+let curView='总览';
+function buildMenu(){const m=$('menu');m.innerHTML='';
+  NAV.forEach(grp=>{const gd=document.createElement('div');gd.className='group';gd.textContent=grp.g;m.appendChild(gd);
+    grp.items.forEach(([name,ic])=>{const it=document.createElement('div');it.className='item'+(name===curView?' active':'');
+      it.dataset.view=name;it.setAttribute('role','button');it.tabIndex=0;
+      it.innerHTML=`<span class="ic" aria-hidden="true">${ic}</span>${name}`;
+      it.onclick=()=>{curView=name;buildMenu();render();document.getElementById('nav').classList.remove('open');};
+      it.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();it.click();}};
+      m.appendChild(it);});});
+}
+document.querySelector('.help .item').onclick=()=>{curView='帮助';buildMenu();render();};
+
+function buildClassSel(){const s=$('classSel');s.innerHTML='';
+  DB.classes.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=`${c.name} · ${c.subject}`;if(c.id===DB.currentClassId)o.selected=true;s.appendChild(o);});
+  const add=document.createElement('option');add.value='__add';add.textContent='＋ 新增任教班级';s.appendChild(add);
+  s.onchange=()=>{if(s.value==='__add'){openClassForm(null);s.value=DB.currentClassId;return;}DB.currentClassId=+s.value;save();render();};
+}
+$('todayDate').textContent=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+/* ============== 附件中心（备课 / 作业 / 教研 通用 · 本机缓存） ==============
+ * 在线版："上传" = 读取文件 → 类型/大小校验 → 写入本机缓存，元数据随主数据同步到腾讯云
+ * 附件库 → 把元数据挂到当前备课/作业/教研记录 → 列表展示 + 预览/下载。
+ * 文件内容存独立 localStorage 键，主 DB 只存元数据，避免放大主数据 JSON。
+ * 状态：uploading（FileReader 真实读取进度）→ success / failed；失败保留原文件可重试。 */
+const ATT_FILE_PREFIX='twb_att_file_';
+const ATT_MAX_FILE=2*1024*1024;        /* 落库后的单文件上限 2MB */
+const ATT_MAX_IMAGE_RAW=8*1024*1024;   /* 拍照原图放宽到 8MB，先压缩再按 2MB 判定 */
+const ATT_TOTAL_BUDGET=3*1024*1024;    /* dataURL 文本总预算，保护 localStorage 配额 */
+const ATT_EXT={
+  jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',heic:'image/heic',
+  pdf:'application/pdf',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt:'text/plain',csv:'text/csv',md:'text/markdown',rtf:'application/rtf',zip:'application/zip'
+};
+const ATT_ACCEPT='.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.rtf,.zip,image/*,application/pdf';
+const ATT_MODS={prep:{label:'备课',key:'prep'},homework:{label:'作业',key:'homework'},research:{label:'教研',key:'research'}};
+const ATT_TASKS={};                    /* 上传任务表：id → {file,...}，失败项保留 File 供重试 */
+let ATT_CTX={mod:'prep',id:null};     /* 当前附件弹窗关联的记录 */
+
+function attKey(id){return ATT_FILE_PREFIX+id;}
+function attExt(name){const s=String(name||'');const i=s.lastIndexOf('.');return i<0?'':s.slice(i+1).toLowerCase();}
+function attSafeName(name){return String(name||'附件').replace(/[\\/:*?"<>|]/g,'_').slice(0,120)||'附件';}
+function attFmtSize(n){n=num(n,0);return n<1024?n+' B':(n<1024*1024?(n/1024).toFixed(1)+' KB':(n/1024/1024).toFixed(1)+' MB');}
+function attIcon(name){const e=attExt(name);
+  return /^(jpg|jpeg|png|gif|webp|bmp|heic)$/.test(e)?'🖼️':(e==='pdf'?'📕':
+    (/^(doc|docx|txt|md|rtf)$/.test(e)?'📄':(/^(xls|xlsx|csv)$/.test(e)?'📊':(/^(ppt|pptx)$/.test(e)?'📑':'📎'))));}
+function attFindRecord(mod,id){const cfg=ATT_MODS[mod];if(!cfg)return null;
+  const list=cur()[cfg.key]||[];return list.find(x=>x.id===num(id,-1))||null;}
+function attListOf(rec){return rec&&Array.isArray(rec.attachments)?rec.attachments:[];}
+function attFindAttachment(id){const rec=attFindRecord(ATT_CTX.mod,ATT_CTX.id);
+  return attListOf(rec).find(a=>a.id===num(id,-1))||null;}
+/* 校验：扩展名白名单 + 危险 MIME 拦截 + 单文件大小；返回错误原因（空串=通过） */
+function attValidate(f){
+  if(!f||typeof f!=='object')return '未读取到文件，请重新选择';
+  const ext=attExt(f.name),mime=String(f.type||'').toLowerCase();
+  if(!ext||!ATT_EXT[ext])return '不支持的文件类型（仅支持图片与常见文档）';
+  if(num(f.size,0)<=0)return '文件内容为空，请重新选择';
+  /* 手机拍照原图往往 3~6MB，图片先放行到读取+压缩阶段，再按压缩后大小判定 */
+  const isImg=/^(jpg|jpeg|png|gif|webp|bmp|heic)$/.test(ext);
+  const limit=isImg?ATT_MAX_IMAGE_RAW:ATT_MAX_FILE;
+  if(num(f.size,0)>limit)return '文件超过 '+attFmtSize(limit)+' 上限，请压缩后重试';
+  if(mime&&/html|svg|xhtml|javascript|x-shockwave|msdownload|x-msdownload|executable/.test(mime))return '该类型存在安全风险，已阻止上传';
+  return '';
+}
+/* 本机附件库：独立键存储，不进主 DB */
+function attUsedBytes(){let n=0;try{(DB.classes||[]).forEach(c=>
+  ['homework','prep','research'].forEach(k=>(c[k]||[]).forEach(r=>attListOf(r).forEach(a=>{n+=num(a.bytes,0);}))));}catch(e){}return n;}
+function attPut(id,dataUrl){
+  if(attUsedBytes()+dataUrl.length>ATT_TOTAL_BUDGET)throw new Error('本机附件空间不足，请删除部分旧附件后重试');
+  try{localStorage.setItem(attKey(id),dataUrl);}catch(e){
+    if(e&&e.name==='QuotaExceededError')throw new Error('本机存储空间不足，请导出备份或删除旧附件后重试');
+    throw new Error('保存失败：'+((e&&e.message)||e));}
+}
+function attGet(id){try{return localStorage.getItem(attKey(id));}catch(e){return null;}}
+function attDel(id){try{localStorage.removeItem(attKey(id));}catch(e){}}
+function attPurge(rec){attListOf(rec).forEach(a=>attDel(a.id));}
+/* 读取文件为 dataURL，带真实进度回调 */
+function attRead(file,task){
+  return new Promise((resolve,reject)=>{
+    if(typeof FileReader==='undefined'){reject(new Error('当前环境不支持文件读取，请更换浏览器后重试'));return;}
+    let r;try{r=new FileReader();}catch(e){reject(new Error('文件读取器初始化失败'));return;}
+    r.onprogress=e=>{if(e&&e.lengthComputable&&e.total>0&&task){task.progress=Math.min(90,Math.round(e.loaded/e.total*90));attRenderList();}};
+    r.onerror=()=>reject(new Error('文件读取失败，请重试'));
+    r.onload=()=>resolve(String(r.result||''));
+    try{r.readAsDataURL(file);}catch(e){reject(new Error('文件读取失败：'+((e&&e.message)||e)));}
+  });
+}
+/* 大图自动压缩（长边 1600px / JPEG 0.82），保证手机拍照可直接保存；不支持 canvas 时跳过 */
+async function attCompress(dataUrl,ext){
+  if(!/^(jpg|jpeg|png|webp)$/.test(ext)||dataUrl.length<400*1024)return dataUrl;
+  if(typeof Image==='undefined'||typeof document==='undefined'||!document.createElement)return dataUrl;
+  try{
+    const img=new Image();
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('图片解码失败'));img.src=dataUrl;});
+    const scale=Math.min(1,1600/Math.max(num(img.width,1),num(img.height,1)));
+    if(scale>=1)return dataUrl;
+    const cv=document.createElement('canvas');if(!cv||!cv.getContext)return dataUrl;
+    cv.width=Math.max(1,Math.round(num(img.width,1)*scale));cv.height=Math.max(1,Math.round(num(img.height,1)*scale));
+    const ctx=cv.getContext('2d');if(!ctx||!ctx.drawImage||!cv.toDataURL)return dataUrl;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0,cv.width,cv.height);
+    const out=cv.toDataURL('image/jpeg',0.82);
+    return out&&out.length<dataUrl.length?out:dataUrl;
+  }catch(e){return dataUrl;}
+}
+/* 轻量提示（成功绿 / 失败红），与既有 handleErr 错误通道分离，避免误判为兜底异常 */
+function attToast(msg,ok){let t=document.getElementById('attToast');
+  if(!t){t=document.createElement('div');t.id='attToast';
+    t.style.cssText='position:fixed;left:50%;bottom:64px;transform:translateX(-50%);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:9999;max-width:90%;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+    document.body.appendChild(t);}
+  t.style.background=ok?'#16a34a':'#dc2626';t.textContent=(ok?'✓ ':'⚠ ')+msg;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>{if(t)t.style.display='none';},3200);}
+/* 上传主流程：校验 → 读取 → 压缩 → 落库 → 关联记录 → 状态回写 */
+async function attUpload(task){
+  task.status='uploading';task.error='';task.progress=5;attRenderList();
+  const bad=attValidate(task.file);
+  if(bad){attFail(task,bad);return false;}
+  try{
+    let dataUrl=await attRead(task.file,task);
+    task.progress=92;attRenderList();
+    const ext=attExt(task.file.name);
+    dataUrl=await attCompress(dataUrl,ext);
+    const i=dataUrl.indexOf(',');
+    const b64=i<0?'':dataUrl.slice(i+1);
+    if(!b64||!/^data:/i.test(dataUrl))throw new Error('文件内容格式异常，请重试');
+    const rawMime=(dataUrl.slice(0,i).match(/^data:([^;,]+)/)||[])[1]||'';
+    const mime=/^image\/jpeg$/i.test(rawMime)?'image/jpeg':(ATT_EXT[ext]||'application/octet-stream');
+    dataUrl='data:'+mime+';base64,'+b64;   /* 强制使用白名单 MIME，阻断伪协议内容 */
+    const finalSize=Math.max(1,Math.round(b64.length*3/4));
+    if(finalSize>ATT_MAX_FILE)throw new Error('文件（压缩后）超过 '+attFmtSize(ATT_MAX_FILE)+' 上限，请压缩或裁剪后重试');
+    const rec=attFindRecord(task.mod,task.recId);
+    if(!rec){attDel(task.id);throw new Error('关联记录已不存在，请刷新后重试');}
+    if(!Array.isArray(rec.attachments))rec.attachments=[];
+    if(rec.attachments.some(a=>a.id===task.id)){task.status='success';task.progress=100;attRenderList();return true;}
+    attPut(task.id,dataUrl);
+    const savedName=attSafeName(task.file.name);
+    rec.attachments.push({id:task.id,name:savedName,mime,ext,
+      size:finalSize,bytes:dataUrl.length,createdAt:new Date().toISOString().slice(0,10)});
+    try{save(DB);}catch(e){attDel(task.id);rec.attachments=rec.attachments.filter(a=>a.id!==task.id);throw e;}  /* 显式传参立即落盘 */
+    task.status='success';task.progress=100;task.error='';task.file=null;   /* 释放 File 引用，失败项才保留供重试 */
+    attRenderList();render();attToast('「'+savedName+'」上传成功',true);
+    return true;
+  }catch(e){attFail(task,(e&&e.message)||'上传失败，请重试');return false;}
+}
+function attFail(task,msg){task.status='failed';task.error=msg;task.progress=0;
+  attRenderList();attToast('上传失败：'+msg,false);}
+/* 选择文件入口（拍照 / 本地多选共用），串行上传避免同时写盘造成配额竞态 */
+function attPicked(input,source){
+  const files=input&&input.files?Array.from(input.files):[];
+  if(input)input.value='';
+  if(!files.length)return;
+  const rec=attFindRecord(ATT_CTX.mod,ATT_CTX.id);
+  if(!rec){handleErr('未找到关联记录，请关闭弹窗刷新后重试');return;}
+  const tasks=files.map(f=>{const id=uid();
+    const t={id,file:f,mod:ATT_CTX.mod,recId:ATT_CTX.id,name:String(f.name||'附件'),
+      size:num(f.size,0),status:'uploading',progress:0,error:'',source:source||'picker'};
+    ATT_TASKS[id]=t;return t;});
+  attRenderList();
+  (async()=>{for(const t of tasks)await attUpload(t);})().catch(e=>handleErr('附件上传异常：'+((e&&e.message)||e)));
+}
+/* 列表渲染：已保存附件 + 进行中/失败任务（失败项保留「重试」） */
+function attItemHTML(a,status,progress,err){
+  const name=esc(a.name||'附件'),ico=attIcon(a.name||'');
+  const mimeLabel=esc((ATT_EXT[attExt(a.name||'')]||a.mime||'文件'));
+  const state=status==='success'?'<span class="att-state ok">✓ 已上传</span>'
+    :status==='uploading'?'<span class="att-state busy"><span class="att-spin"></span>上传中 '+num(progress,0)+'%</span>'
+    :'<span class="att-state bad">✕ 上传失败</span>';
+  const bar=status==='uploading'?'<div class="att-bar"><span style="width:'+num(progress,0)+'%"></span></div>':'';
+  const msg=err?'<div class="att-meta" style="color:var(--red)">原因：'+esc(err)+'</div>':'';
+  const ops=status==='success'
+    ?'<button class="btn ghost sm" data-act="attOpen" data-id="'+num(a.id,0)+'">预览/下载</button><button class="btn red sm" data-act="attDel" data-id="'+num(a.id,0)+'">删除</button>'
+    :status==='failed'
+      ?'<button class="btn blue sm" data-act="attRetry" data-id="'+num(a.id,0)+'">重试</button><button class="btn ghost sm" data-act="attDrop" data-id="'+num(a.id,0)+'">移除</button>'
+      :'<span class="att-meta">正在保存到本机…</span>';
+  return '<div class="att-item"><span class="att-ico">'+ico+'</span><div class="att-main">'
+    +'<div class="att-name">'+name+'</div><div class="att-meta">'+mimeLabel+' · '+attFmtSize(a.size)+'</div>'
+    +bar+msg+'</div><div>'+state+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+ops+'</div></div>';
+}
+function attRenderList(){
+  const box=$('attList');if(!box)return;
+  const rec=attFindRecord(ATT_CTX.mod,ATT_CTX.id);
+  const saved=attListOf(rec).map(a=>attItemHTML(a,'success',100,''));
+  const pending=Object.keys(ATT_TASKS).map(k=>ATT_TASKS[k])
+    .filter(t=>t.mod===ATT_CTX.mod&&t.recId===ATT_CTX.id&&t.status!=='success')
+    .map(t=>attItemHTML({id:t.id,name:t.name,size:t.size,mime:ATT_EXT[attExt(t.name)]},t.status,t.progress,t.error));
+  box.innerHTML=(saved.concat(pending).join(''))||'<div class="empty">暂无附件，可拍照或从本机选择文件上传</div>';
+}
+/* 弹窗：拍照（capture=environment，移动端直接调起相机）+ 本地多选 */
+function openAttach(mod,id){
+  const rec=attFindRecord(mod,id);if(!rec){handleErr('未找到该记录，请刷新后重试');return;}
+  ATT_CTX={mod,id:num(id,-1)};
+  const n=attListOf(rec).length;
+  modal(`<h3>📎 附件 · ${esc(rec.title||'记录')}</h3>
+  <div class="view-desc" style="margin-bottom:10px">支持手机拍照或从本机选择图片、文档等常见附件（可多选）。文件保存在本机缓存（需联网登录使用，换设备需重新上传）；落库单文件上限 ${attFmtSize(ATT_MAX_FILE)}，JPG/PNG/WebP 大图自动压缩（拍照原图可至 ${attFmtSize(ATT_MAX_IMAGE_RAW)}）。</div>
+  <div class="row-actions" style="margin-bottom:6px">
+    <label class="btn blue sm" for="attCamera" style="cursor:pointer">📷 拍照上传</label>
+    <label class="btn ghost sm" for="attPicker" style="cursor:pointer">📁 选择文件</label>
+    <span class="att-meta" style="margin-left:auto">${esc(ATT_MODS[mod].label)} · 已有 ${n} 个附件</span></div>
+  <input class="att-picker" id="attCamera" type="file" accept="image/*" capture="environment" onchange="attPicked(this,'camera')">
+  <input class="att-picker" id="attPicker" type="file" multiple accept="${ATT_ACCEPT}" onchange="attPicked(this,'picker')">
+  <div class="att-list" id="attList"></div>
+  <div class="att-preview" id="attPreview" style="display:none"></div>
+  <div class="muted-note">附件内容保存在本机浏览器中；导出的加密备份只含记录与附件清单，换设备后需重新上传文件。</div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+  attRenderList();
+}
+/* 重试 / 移除失败项 / 删除已存附件 / 预览下载 */
+function attRetry(id){const t=ATT_TASKS[id];if(!t){handleErr('该上传任务已失效，请重新选择文件');return;}
+  if(!t.file){handleErr('原文件已不可读取，请重新选择文件上传');return;}
+  const bad=attValidate(t.file);   /* 类型/大小类确定性错误：提示换文件，避免无意义的重复失败 */
+  if(bad){attToast('该文件仍不符合要求（'+bad+'），请重新选择文件',false);return;}
+  attUpload(t);}
+function attDrop(id){delete ATT_TASKS[id];attRenderList();}
+function attDelConfirm(id){if(!confirm('确定删除该附件？'))return;
+  const rec=attFindRecord(ATT_CTX.mod,ATT_CTX.id);
+  if(!rec||!Array.isArray(rec.attachments)){handleErr('未找到该附件，请刷新后重试');return;}
+  rec.attachments=rec.attachments.filter(a=>a.id!==num(id,-1));attDel(id);save();
+  attRenderList();render();attToast('附件已删除',true);}
+function attClosePreview(){const p=$('attPreview');if(p){p.innerHTML='';p.style.display='none';}}
+function attDownload(a,data){
+  try{const link=document.createElement('a');link.href=data;link.download=attSafeName(a.name||'附件');
+    if(document.body&&document.body.appendChild)document.body.appendChild(link);
+    if(link.click)link.click();if(link.remove)link.remove();
+    attToast('已开始下载「'+attSafeName(a.name||'附件')+'」',true);
+  }catch(e){handleErr('下载失败：'+((e&&e.message)||e));}}
+function attOpen(id){const a=attFindAttachment(id);if(!a){handleErr('未找到该附件，请刷新后重试');return;}
+  const data=attGet(a.id);
+  if(!data){handleErr('附件内容已丢失，请删除后重新上传');attRenderList();return;}
+  if(!/^data:(image|application|text)\//i.test(data)){handleErr('附件内容格式异常，已阻止打开');return;}
+  const box=$('attPreview');
+  if(/^image\//.test(a.mime||'')&&box){
+    box.innerHTML=`<div class="sec-title" style="margin-top:0">图片预览</div><img src="${esc(data)}" alt="${esc(a.name||'附件')}">
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center"><button class="btn ghost sm" data-act="attClosePreview">关闭预览</button>
+      <button class="btn blue sm" data-act="attDownload" data-id="${num(a.id,0)}">下载原文件</button></div>`;
+    box.style.display='block';return;}
+  attDownload(a,data);}
+/* 视图内的附件摘要与入口按钮（只追加，不改原有字段与按钮） */
+function attChips(rec){const list=attListOf(rec);if(!list.length)return '';
+  return '<div>'+list.slice(0,3).map(a=>`<span class="att-chip" title="${esc(a.name)}">📎 ${esc(a.name)}</span>`).join('')
+    +(list.length>3?`<span class="att-chip">+${list.length-3}</span>`:'')+'</div>';}
+function attBtn(mod,id){const rec=attFindRecord(mod,id);
+  return `<button class="btn ghost sm" data-act="attOpenMgr" data-mod="${mod}" data-id="${num(id,0)}">📎 附件 ${attListOf(rec).length}</button>`;}
+
+/* ============== 工具 ============== */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+/* 外链协议白名单：仅允许 http/https，阻断 javascript:/data: 等存储型 XSS */
+/* D07：外链协议白名单，见上方注释 */
+function safeUrl(u){const s=String(u==null?'':u).trim();return /^https?:\/\//i.test(s)?s:'#';}
+/* D05：Date.now()*1000 + 自增序列，严格单调、跨毫秒不碰撞、保持安全整数 */
+function uid(){__idSeq++;return Date.now()*1000+__idSeq;}
+function modal(h){$('modal').innerHTML=h;$('modalBg').classList.add('show');}
+function closeModal(){$('modalBg').classList.remove('show');}
+$('modalBg').onclick=e=>{if(e.target===$('modalBg'))closeModal();};
+/* D07：iframe src 二次校验，阻断危险协议 */
+function openFs(url,t){const u=safeUrl(url);if(u==='#'){handleErr('该资源链接不是有效的 http/https 地址，已阻止打开');return;}
+  $('fsTitle').textContent=t||'全屏演示';$('fsFrame').src=u;$('fsBg').classList.add('show');}
+function closeFs(){$('fsFrame').src='';$('fsBg').classList.remove('show');}
+/* 事件委托（安全加固）：动态 HTML 中的操作统一走 data-act + data-*，避免把用户可控数据拼进内联 onclick 的 JS 字符串；
+   新增交互请优先注册到 ACT，而非回退到内联 onclick */
+const ACT={
+  genComment:t=>genComment(t.dataset.name||''),
+  openFs:t=>openFs(t.dataset.url||'#',t.dataset.name||'全屏演示'),
+  closeFs:()=>closeFs(),
+  closeLive:()=>closeLive(),
+  /* 附件：统一走事件委托，data-id 只传数字 uid，不把文件名拼进内联 JS */
+  attOpenMgr:t=>openAttach(t.dataset.mod,num(t.dataset.id,-1)),
+  attRetry:t=>attRetry(num(t.dataset.id,-1)),
+  attDrop:t=>attDrop(num(t.dataset.id,-1)),
+  attDel:t=>attDelConfirm(num(t.dataset.id,-1)),
+  attOpen:t=>attOpen(num(t.dataset.id,-1)),
+  attDownload:t=>{const a=attFindAttachment(num(t.dataset.id,-1));if(a){const d=attGet(a.id);if(d)attDownload(a,d);}},
+  attClosePreview:()=>attClosePreview(),
+};
+document.addEventListener('click',e=>{const el=e.target;if(!el||!el.closest)return;const t=el.closest('[data-act]');if(!t)return;
+  const fn=ACT[t.dataset.act];if(fn){try{fn(t);}catch(err){handleErr('操作失败：'+(err.message||err));}}});
+
+/* SVG 图表 */
+function svgLine(vals){if(!vals.length)return'';const w=340,h=130,p=22;
+  if(vals.length===1)vals=[vals[0],vals[0]];
+  const mx=Math.max(...vals),mn=Math.min(...vals),rg=(mx-mn)||1;
+  const X=i=>p+i*(w-2*p)/(vals.length-1), Y=v=>h-p-(v-mn)/rg*(h-2*p);
+  const poly=vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const dots=vals.map((v,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="#3b82f6"/>`).join('');
+  const lbls=vals.map((v,i)=>`<text x="${X(i).toFixed(1)}" y="${(Y(v)-8).toFixed(1)}" font-size="10" fill="#6b7280" text-anchor="middle">${v}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:150px"><polyline points="${poly}" fill="none" stroke="#3b82f6" stroke-width="2.5"/>${dots}${lbls}</svg>`;
+}
+function svgRadar(labels,vals){const n=labels.length,cx=140,cy=120,r=82,A=i=>(-Math.PI/2)+i*2*Math.PI/n;
+  const P=(i,rad)=>[cx+Math.cos(A(i))*rad,cy+Math.sin(A(i))*rad];let g='';
+  [0.25,0.5,0.75,1].forEach(f=>{g+=`<polygon points="${labels.map((_,i)=>{const[x,y]=P(i,r*f);return x.toFixed(1)+','+y.toFixed(1);}).join(' ')}" fill="none" stroke="#e5e7eb"/>`;});
+  const dp=vals.map((v,i)=>{const[x,y]=P(i,r*(v/100));return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+  const lb=labels.map((t,i)=>{const[x,y]=P(i,r+16);return `<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" font-size="10" fill="#6b7280" text-anchor="middle">${esc(t)}</text>`;}).join('');
+  const dc=vals.map((v,i)=>{const[x,y]=P(i,r*(v/100));return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="#3b82f6"/>`;}).join('');
+  return `<svg viewBox="0 0 280 250" style="width:100%;max-width:320px">${g}<polygon points="${dp}" fill="rgba(59,130,246,.22)" stroke="#3b82f6" stroke-width="2"/>${dc}${lb}</svg>`;
+}
+
+/* ============== 路由 ============== */
+function render(){try{buildClassSel();const c=cur();$('who').textContent=`${c.stage}·${c.grade}·${c.subject}·${c.edition}`;
+  const v=VIEWS.find(x=>x.name===curView);
+  ((v&&v.render)||viewOverview)($('content'));}catch(e){handleErr('渲染当前页面出错：'+(e.message||e));const ct=$('content');if(ct)ct.innerHTML='<div class="panel"><h3>⚠ 页面渲染出错</h3><p style="font-size:13px;color:var(--muted)">'+esc(e.message||String(e))+'</p><button class="btn" onclick="render()">重试</button></div>';}}
+
+/* ============== 视图层（各 viewXxx 返回 innerHTML；按「备-教-改-辅-考-研-管」工作流组织） ============== */
+/* ---- 总览 ---- */
+function viewOverview(c){const k=cur();const ex=Array.isArray(k.exams)&&k.exams.length?k.exams:[{avg:0,scores:[]}];const last=ex[ex.length-1],prev=ex[ex.length-2];
+  const dAvg=prev?+(num(last.avg)-num(prev.avg)).toFixed(1):'';
+  const cards=[['平均分',last.avg+'分',dAvg],['及格率',pct(last)+'%',diff(last,prev,'pass')],
+    ['优秀率',pct(last,'excellent')+'%',diff(last,prev,'excellent')],['预警学生',k.warnings.length+'人',-k.warnings.length]];
+  const ch=cards.map(s=>`<div class="stat"><div class="num">${s[1]}</div><div class="lbl">${s[0]}</div>
+    <div class="delta ${typeof s[2]==='number'?(s[2]>0?'up':(s[2]<0?'down':'')):''}">${typeof s[2]==='number'?(s[2]>0?'↑ '+(Math.abs(s[2])):(s[2]<0?'↓ '+(Math.abs(s[2])):'')):''}</div></div>`).join('');
+  const quick=[['学情分析','📊'],['教学课表','▤'],['课堂互动','✦'],['作业中心','✓']].map(q=>`<div class="q" onclick="goto('${q[0]}')">${q[1]} ${q[0]}</div>`).join('');
+  c.innerHTML=`<div class="view-title">总览工作台</div>
+    <div class="view-desc">${esc(k.name)} · ${esc(k.subject)}（${esc(k.edition)}）。数据自动保存在本机，切换顶部班级即可联动全部内容。</div>
+    <div class="cards">${ch}</div>
+    <div class="panel" style="margin-bottom:16px"><h3>成绩趋势 <span class="badge">近 ${ex.length} 次测评</span></h3>${svgLine(ex.map(e=>+e.avg))}</div>
+    <div style="margin-bottom:16px"><h3 style="font-size:15px;margin-bottom:10px">常用入口</h3><div class="quick">${quick}</div></div>`;
+}
+function pct(ex,mode){const s=(ex&&ex.scores)||[];const n=Math.max(1,s.length);if(mode==='excellent')return Math.round(s.filter(x=>num(x.total,0)>=85).length/n*100);
+  return Math.round(s.filter(x=>num(x.total,0)>=60).length/n*100);}
+function diff(last,prev,mode){if(!prev)return '';return pct(last,mode)-pct(prev,mode);}
+function goto(v){curView=v;buildMenu();render();}
+
+/* ---- 学情分析（结合两个工作台：KPI趋势+折线+知识点/题型+雷达+预警+AI报告） ---- */
+function viewAnalytics(c){const k=cur();const prof=profOf(k.subject);const ex=Array.isArray(k.exams)&&k.exams.length?k.exams:[{avg:0,scores:[]}];const last=ex[ex.length-1],prev=ex[ex.length-2];
+  const dAvg=prev?+(num(last.avg)-num(prev.avg)).toFixed(1):'';
+  const cards=[['平均分',last.avg+'分',dAvg],['及格率',pct(last)+'%',diff(last,prev,'pass')],
+    ['优秀率',pct(last,'excellent')+'%',diff(last,prev,'excellent')],['预警学生',k.warnings.length+'人','']];
+  const cardHtml=cards.map(s=>`<div class="stat"><div class="num">${s[1]}</div><div class="lbl">${s[0]}</div>
+    <div class="delta ${typeof s[2]==='number'?(s[2]>0?'up':(s[2]<0?'down':'')):''}">${typeof s[2]==='number'?(s[2]>0?'↑ '+Math.abs(s[2]):(s[2]<0?'↓ '+Math.abs(s[2]):'')):''}</div></div>`).join('');
+  let secondPanel;
+  if(prof.kp){const bars=k.kp.map(p=>`<tr><td>${esc(p.name)}</td><td><div class="bar ${p.rate<70?'red':(p.rate<85?'amber':'')}"><span style="width:${p.rate}%"></span></div></td><td>${p.rate}%</td></tr>`).join('');
+    const radar=k.radar.length?svgRadar(k.radar.map(d=>d.name),k.radar.map(d=>d.val)):'';
+    secondPanel=`<div class="panel"><h3>知识点掌握率</h3><table><tr><th>知识点</th><th style="width:45%">掌握率</th><th>比例</th></tr>${bars}</table></div>
+      <div class="panel"><h3>学生能力画像${k.radar.length?'':'（该学科暂无维度）'}</h3>${radar||'<div class="empty">—</div>'}</div>`;}
+  else{const bars=k.types.map(t=>`<tr><td>${esc(t.name)}</td><td><div class="bar ${t.rate<60?'red':(t.rate<75?'amber':'')}"><span style="width:${t.rate}%"></span></div></td><td>${t.rate}%</td></tr>`).join('');
+    secondPanel=`<div class="panel"><h3>各题型得分率</h3><table><tr><th>题型</th><th style="width:45%">得分率</th><th>比例</th></tr>${bars}</table></div>
+      <div class="panel"><h3>薄弱题型洞察</h3><div class="insight">🔍 ${weak(k.types)}</div></div>`;}
+  const warnHtml=k.warnings.length?k.warnings.map(w=>`<div class="warn"><b>${esc(w.name)}</b> · 近期成绩 ${num(w.score,0)} 分 — ${esc(w.reason)}</div>`).join(''):'<div class="empty">暂无预警学生，整体平稳 👍</div>';
+  const PAGE=50,sTotal=last.scores.length,sPages=Math.max(1,Math.ceil(sTotal/PAGE));if(scorePage>sPages)scorePage=sPages;
+  const rows=last.scores.slice((scorePage-1)*PAGE,scorePage*PAGE).map(s=>`<tr><td>${esc(s.name)}</td><td><b>${num(s.total,0)}</b></td><td>${num(s.full,100)}</td><td style="color:${num(s.total,0)<60?'var(--red)':'inherit'}">${num(s.total,0)<60?'预警':'正常'}</td></tr>`).join('');
+  c.innerHTML=`<div class="view-title">📊 学情分析</div>
+    <div class="view-desc">基于近期测评数据，全面分析 ${esc(k.name)} 的学业情况，及时发现问题并指导学生改进。</div>
+    <div class="cards">${cardHtml}</div>
+    <div class="grid2"><div class="panel"><h3>成绩趋势</h3>${svgLine(ex.map(e=>+e.avg))}</div>
+      <div class="panel"><h3>快捷操作</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn blue" onclick="aiReport()">🤖 生成学情报告</button>
+        <button class="btn ghost" onclick="editExam()">✎ 录入/编辑成绩</button>
+        <button class="btn ghost" onclick="exportExam()">导出成绩 CSV</button></div></div></div>
+    <div class="grid2" style="margin-top:16px">${secondPanel}</div>
+    <div class="grid2" style="margin-top:16px"><div class="panel"><h3>学情预警 <span class="badge">${k.warnings.length} 人</span></h3>${warnHtml}</div>
+      <div class="panel"><h3>个体分析 · ${esc((last.scores[0]||{name:'—'}).name)}</h3>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">班级排名参考 · 近期成绩 ${num((last.scores[0]||{}).total,0)} 分</div>
+        ${svgLine(last.scores.slice(0,4).map(s=>num(s.total,0)))}</div></div>
+    <div class="panel" style="margin-top:16px"><h3>学生成绩明细 <span class="badge">${last.scores.length} 人</span></h3>
+      <table><tr><th>姓名</th><th>总分</th><th>满分</th><th>状态</th></tr>${rows}</table>
+      ${pagerHtml(scorePage,sPages,sTotal,'setScorePage')}</div>`;
+}
+function weak(types){const w=types.slice().sort((a,b)=>a.rate-b.rate)[0];return w?`「${w.name}」得分率最低（${w.rate}%），建议加强专项训练与讲评。`:'数据充足，暂无明显薄弱项。';}
+/* D06：单次测评 / 空知识点与题型不再崩溃，报告文本整体 esc 后输出 */
+function aiReport(){const k=cur();const prof=profOf(k.subject);
+  const ex=Array.isArray(k.exams)&&k.exams.length?k.exams:[{avg:0,scores:[]}];
+  const last=ex[ex.length-1],prev=ex[ex.length-2];
+  const low=(k.warnings||[]).map(w=>w.name).join('、')||'无';
+  const arr=(prof.kp?(k.kp||[]):(k.types||[])).slice().sort((a,b)=>num(a.rate,0)-num(b.rate,0));
+  const focus=arr.length?arr[0].name:'本阶段核心内容';
+  const delta=prev?num(last.avg,0)-num(prev.avg,0):0;
+  const report=[
+    '【'+k.stage+k.grade+' · '+k.subject+'（'+k.edition+'）学情报告】',
+    '一、总体情况：近期 '+ex.length+' 次测评，平均分 '+num(last.avg,0)+' 分，及格率 '+pct(last)+'%，优秀率 '+pct(last,'excellent')+'%。',
+    prev?('二、趋势：较上次测评，平均分'+(delta>=0?'上升':'下降')+' '+Math.abs(delta).toFixed(1)+' 分。'):'二、趋势：暂无上一次测评数据，无法计算环比。',
+    '三、薄弱环节：'+focus+' 掌握/得分率偏低，需重点突破。',
+    '四、预警学生：'+low+'，建议个别辅导与错题重做。',
+    '五、教学建议：1) 针对'+focus+'补充专项训练；2) 课堂互动增加'+k.subject+'情境化练习；3) 建立错题档案，定期回访。'
+  ].join('\n');
+  modal(`<h3>📝 ${esc(k.name)} · ${esc(k.subject)} 学情报告</h3>
+    <div class="field"><textarea style="min-height:240px">${esc(report)}</textarea></div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button>
+    <button class="btn green" onclick="copyReport()">复制报告</button></div>`);}
+function copyReport(){const t=$('modal').querySelector('textarea');if(t)copyText(t.value);}
+
+/* ---- 知识点库（学科自适应名称与内容） ---- */
+function viewKnowledge(c){const k=cur();const title=k.subject==='物理'||k.subject==='化学'||k.subject==='数学'?'公式与定理':(profOf(k.subject).kind==='arts'?'知识点与素材':'知识点库');
+  const rows=k.knowledge.map(f=>`<div class="rec"><div class="title">${esc(f.title)}</div><div class="body">${esc(f.body)}</div></div>`).join('');
+  c.innerHTML=`<div class="view-title">∑ ${title}</div>
+    <div class="view-desc">${esc(k.subject)} 核心内容速查，备课与讲评随手调出（可按学科自动匹配）。</div>
+    <div class="card-list">${rows||'<div class="empty">暂无内容</div>'}</div>`;}
+
+/* ---- 资源库（按学科推荐） ---- */
+function viewResources(c){const k=cur();const types=['全部',...new Set(k.resources.map(r=>r.tag))];
+  const sel='<select id="resFilter" onchange="filterRes()">'+types.map(t=>`<option>${esc(t)}</option>`).join('')+'</select>';
+  c.innerHTML=`<div class="view-title">🔗 资源库</div>
+    <div class="view-desc">${esc(k.subject)} 相关优质外部资源，集中管理。点「🖥 全屏演示」内嵌打开，或「↗ 打开资源」新窗口访问。</div>
+    <div class="row-actions"><button class="btn green" onclick="newRes()">+ 新建资源</button><div class="right">${sel}</div></div>
+    <div class="res-grid" id="resGrid"></div>`;renderResGrid('全部');}
+function renderResGrid(type){const k=cur();const list=k.resources.filter(r=>type==='全部'||r.tag===type).map(r=>`<div class="res"><span class="tag">${esc(r.tag)}</span>
+  <div class="name">${esc(r.name)}</div><div class="desc">${esc(r.desc)}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"><button class="btn blue sm" data-act="openFs" data-url="${esc(safeUrl(r.url))}" data-name="${esc(r.name)}">🖥 全屏演示</button>
+  <a class="open" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">↗ 打开资源</a></div>
+  <div style="margin-top:6px"><button class="btn ghost sm" onclick="editRes(${r.id})">编辑</button><button class="btn red sm" onclick="delRes(${r.id})">删除</button></div></div>`).join('');
+  $('resGrid').innerHTML=list||'<div class="empty">该分类暂无资源</div>';}
+function filterRes(){renderResGrid($('resFilter').value);}
+function newRes(){openResForm(null);}
+function editRes(id){const r=cur().resources.find(x=>x.id===id);if(!r){handleErr('未找到该资源，请刷新后重试');return;}openResForm(r);}
+function openResForm(r){const e=!!r;modal(`<h3>${e?'编辑资源':'新建资源'}</h3>
+  <div class="field"><label>名称</label><input id="r_name" value="${e?esc(r.name):''}"></div>
+  <div class="field"><label>类型标签</label><input id="r_tag" value="${e?esc(r.tag):''}"></div>
+  <div class="field"><label>简介</label><textarea id="r_desc">${e?esc(r.desc):''}</textarea></div>
+  <div class="field"><label>链接</label><input id="r_url" value="${e?esc(r.url):''}"></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveRes(${e?r.id:'null'})">保存</button></div>`);}
+function saveRes(id){const d={name:$('r_name').value,tag:$('r_tag').value,desc:$('r_desc').value,url:$('r_url').value};if(!d.name){alert('请填写名称');return;}
+  const k=cur();
+  if(id&&id!=='null'){const r=k.resources.find(x=>x.id===id);if(!r){handleErr('未找到要编辑的资源，请刷新后重试');return;}Object.assign(r,d);}
+  else k.resources.push({id:uid(),...d});
+  save();closeModal();viewResources($('content'));}
+function delRes(id){if(!confirm('确定删除该资源？'))return;const k=cur();k.resources=k.resources.filter(r=>r.id!==id);save();viewResources($('content'));}
+
+/* ---- 学生管理 ---- */
+let stuPage=1,scorePage=1;
+/* 大表分页：超过 pageSize 行时分页渲染，避免大班级整表重绘卡顿 */
+function pagerHtml(page,pages,total,setter){if(pages<=1)return '';
+  return `<div style="display:flex;gap:10px;align-items:center;justify-content:center;margin-top:10px">
+    <button class="btn ghost sm" onclick="${setter}(${Math.max(1,page-1)})">上一页</button>
+    <span style="font-size:12px;color:var(--muted)">第 ${page} / ${pages} 页 · 共 ${total} 条</span>
+    <button class="btn ghost sm" onclick="${setter}(${Math.min(pages,page+1)})">下一页</button></div>`;}
+function setStuPage(p){stuPage=p;viewStudents($('content'));}
+function setScorePage(p){scorePage=p;viewAnalytics($('content'));}
+function viewStudents(c){const k=cur();const last=k.exams[k.exams.length-1];
+  const PAGE=50,total=k.students.length,pages=Math.max(1,Math.ceil(total/PAGE));if(stuPage>pages)stuPage=pages;
+  const rows=k.students.slice((stuPage-1)*PAGE,stuPage*PAGE).map(s=>{const sc=last?last.scores.find(x=>x.name===s.name):null;const v=sc?sc.total:'—';
+    return `<tr><td>${esc(s.sid)}</td><td>${esc(s.name)}</td><td>${v}分</td>
+      <td><button class="btn blue sm" data-act="genComment" data-name="${esc(s.name)}">生成评语</button>
+      <button class="btn ghost sm" onclick="delStudent(${s.id})">删除</button></td></tr>`;}).join('');
+  c.innerHTML=`<div class="view-title">☺ 学生成长</div><div class="view-desc">${esc(k.name)} 学生名册与成长档案，关联学情分析自动统计，可一键生成个性化评语。</div>
+  <div class="row-actions"><button class="btn green" onclick="addStudent()">+ 添加学生</button>
+    <button class="btn blue" onclick="growthSummary()">班级成长概览</button></div>
+  <div class="panel"><table><tr><th>学号</th><th>姓名</th><th>最近成绩</th><th>操作</th></tr>${rows||'<tr><td colspan=4 class="empty">暂无</td></tr>'}</table>
+  ${pagerHtml(stuPage,pages,total,'setStuPage')}</div>`;}
+function addStudent(){const n=prompt('学生姓名：');if(!n)return;const k=cur();k.students.push({id:uid(),name:n,sid:String(k.students.length+1).padStart(2,'0')});
+  // 同步给最近一次测评补充成绩
+  if(k.exams.length){const last=k.exams[k.exams.length-1];last.scores.push({name:n,total:Math.round(60+Math.random()*30),full:100});last.avg=+(last.scores.reduce((a,b)=>a+num(b.total,0),0)/Math.max(1,last.scores.length)).toFixed(1);}
+  save();viewStudents($('content'));}
+/* D28：删除学生同步移除成绩并重算均分，保持名册与学情一致 */
+function delStudent(id){if(!confirm('确定删除该学生？（最近成绩记录同步移除）'))return;const k=cur();
+  const s=k.students.find(x=>x.id===id);if(!s){handleErr('未找到该学生，请刷新后重试');return;}
+  k.students=k.students.filter(x=>x.id!==id);
+  /* 同步移除各次测评中的该生成绩并重算均分，保持名册与学情一致 */
+  (k.exams||[]).forEach(e=>{if(!Array.isArray(e.scores))return;e.scores=e.scores.filter(x=>x.name!==s.name);
+    e.avg=+(e.scores.reduce((a,b)=>a+num(b.total,0),0)/Math.max(1,e.scores.length)).toFixed(1);});
+  k.warnings=(k.warnings||[]).filter(w=>w.name!==s.name);
+  save();render();}
+function genComment(name){const k=cur();const last=k.exams[k.exams.length-1];const sc=last?last.scores.find(x=>x.name===name):null;
+  const w=k.warnings.find(x=>x.name===name);const v=sc?sc.total:70;
+  let level=v>=85?'优等生':(v>=70?'稳定型':(v>=60?'需关注':'重点帮扶'));
+  const t=`${name}同学：${last?('最近一次「'+last.name+'」得分 '+v+' 分，'):''}总体处于「${level}」水平。`
+    +(w?('需注意：'+w.reason+'。'):'学习态度端正，保持节奏即可。')
+    +'建议：'+(v>=85?'可承担小组引领，拓展拔高训练；':(v>=60?'巩固基础题型，针对薄弱点专项突破；':'建立错题本，降低基础失分，家校协同重点辅导。'))
+    +'（本评语由工作台内置规则基于学情数据生成，教师可据实修改。）';
+  modal(`<h3>生成评语 · ${esc(name)}</h3><div class="field"><textarea id="cmt" style="height:160px">${esc(t)}</textarea></div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button>
+    <button class="btn green" onclick="alert('已复制到剪贴板（演示）');closeModal()">复制</button></div>`);}
+function growthSummary(){const k=cur();const last=k.exams[k.exams.length-1];if(!last){alert('暂无测评数据');return;}
+  const items=last.scores.slice().sort((a,b)=>b.total-a.total).map(s=>s.name+' '+s.total).join('、');
+  modal(`<h3>${esc(k.name)} · 成长概览</h3><div class="field"><label>最近测评</label><input value="${esc(last.name)} · 平均 ${num(last.avg,0)} 分" disabled></div>
+    <div class="field"><label>成绩排序</label><textarea style="height:140px" disabled>${esc(items)}</textarea></div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);}
+
+/* ---- 作业中心（布置 / 跟踪 / 错题本，对应「改」） ---- */
+function viewHomework(c){const k=cur();const hw=k.homework.map(h=>`<tr><td>${esc(h.title)}${attChips(h)}</td><td><span class="tag">${esc(h.cls)}</span></td>
+  <td><span class="tag ${h.layer==='重点'?'amber':(h.layer==='拓展'?'blue':'gray')}">${esc(h.layer||'全员')}</span></td>
+  <td><span class="tag ${h.status==='已完成'?'green':(h.status==='批改中'?'amber':'gray')}">${esc(h.status)}</span></td>
+  <td><button class="btn ghost sm" onclick="setHw(${h.id})">状态</button>${attBtn('homework',h.id)}<button class="btn red sm" onclick="delHw(${h.id})">删除</button></td></tr>`).join('');
+  const ms=k.mistakes.map(m=>`<div class="rec"><div class="head"><span class="title">${esc(m.q)}</span>
+    <span><span class="tag amber">掌握 ${num(m.rate,0)}%</span></span></div><div class="body">错因：${esc(m.reason)}<br>巩固：${esc(m.fix)}</div>
+    <div class="foot"><button class="btn blue sm" onclick="reviewMistake(${m.id})">标记巩固</button><button class="btn red sm" onclick="delMistake(${m.id})">删除</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">✓ 作业中心</div><div class="view-desc">布置分层作业、跟踪提交与批改，沉淀共性错题形成错题本（对应工作流「改」）。</div>
+  <div class="row-actions"><button class="btn green" onclick="addHw()">+ 新建作业</button>
+    <button class="btn amber" onclick="addMistake()">+ 登记错题</button>
+    <button class="btn blue" onclick="commonMistakes()">共性错题分析</button>
+    <button class="btn purple" onclick="goto('智能批改')">🤖 智能批改</button></div>
+  <div class="panel"><div class="sec-title">作业与提交</div><table><tr><th>作业</th><th>学科</th><th>分层</th><th>状态</th><th>操作</th></tr>${hw}</table></div>
+  <div class="card-list"><div class="sec-title">错题本（${k.mistakes.length}）</div>${ms||'<div class="empty">暂无错题，可在学情预警处沉淀</div>'}</div>`;}
+function addHw(){const t=prompt('作业内容：');if(!t)return;const layer=prompt('分层（全员/重点/拓展）：','全员')||'全员';
+  cur().homework.push({id:uid(),title:t,cls:cur().subject,status:'未完成',layer,attachments:[]});save();viewHomework($('content'));}
+/* D11：find 结果统一判空 + 可读提示（同类修复见 reviewMistake/editPrep/savePrep/editResearch/editRes/editQuiz/markFamily/deliverFamily） */
+function setHw(id){const k=cur();const h=k.homework.find(x=>x.id===id);if(!h){handleErr('未找到该作业，请刷新后重试');return;}
+  const s=prompt('修改状态（未完成/批改中/已完成）：',h.status);if(!s)return;h.status=s;save();viewHomework($('content'));}
+function delHw(id){if(!confirm('确定删除该作业？'))return;const k=cur();const h=k.homework.find(x=>x.id===id);
+  if(h)attPurge(h);   /* 删除记录时同步回收附件文件，避免遗留孤儿数据 */
+  k.homework=k.homework.filter(h=>h.id!==id);save();viewHomework($('content'));}
+function addMistake(){const q=prompt('错题/典型题：');if(!q)return;const r=prompt('错因：','概念不清')||'概念不清';
+  cur().mistakes.push({id:uid(),subj:cur().subject,q,reason:r,fix:'同类变式巩固',rate:Math.round(35+Math.random()*30)});save();viewHomework($('content'));}
+function delMistake(id){if(!confirm('确定删除该错题记录？'))return;const k=cur();k.mistakes=k.mistakes.filter(m=>m.id!==id);save();viewHomework($('content'));}
+function reviewMistake(id){const k=cur();const m=k.mistakes.find(x=>x.id===id);if(!m){handleErr('未找到该错题记录，请刷新后重试');return;}
+  m.rate=Math.min(100,num(m.rate,0)+15);save();viewHomework($('content'));}
+function commonMistakes(){const k=cur();if(!k.mistakes.length){alert('暂无错题数据');return;}
+  const low=k.mistakes.filter(m=>m.rate<55);modal(`<h3>共性错题分析</h3><div class="field"><label>薄弱点（掌握率<55%）</label>
+  <textarea style="height:140px" disabled>${esc(low.map(m=>m.q+'：'+m.reason).join('\n')||'暂无')}</textarea></div>
+  <div class="field"><label>教学建议</label><textarea style="height:90px" disabled>${esc('1）针对共性错题回归对应知识点重讲；2）布置同类变式 3-5 题分层巩固；3）一周后复测验证掌握率提升。')}</textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);}
+
+/* ---- 备课中心（教案 / 模板 / 关联知识点，对应「备」） ---- */
+const PREP_TPL={
+  '语文':'【教学目标】识字与阅读/写作目标；【重难点】；【教学过程】导入-初读-精读-小结-作业；【板书】；【反思】',
+  '数学':'【教学目标】知识与技能；【重难点】；【教学过程】复习-探究-例题-练习-小结；【作业分层】基础/拓展；【反思】',
+  '英语':'【教学目标】听/说/读/写；【重难点】；【教学过程】Warm-up-Presentation-Practice-Production-Homework；【反思】',
+  '物理':['【教学目标】；【实验/演示】；【重难点】；【过程】情境-猜想-探究-结论-应用；【反思】'],
+  '化学':'【教学目标】；【实验安全】；【重难点】；【过程】现象-原理-方程式-应用；【反思】',
+  '生物':'【教学目标】；【观察/实验】；【重难点】；【过程】情境-探究-结论-应用；【反思】',
+  '历史':'【教学目标】时空与史实；【重难点】；【过程】导入-史料研读-探究-小结；【反思】',
+  '地理':'【教学目标】读图能力；【重难点】；【过程】读图-分析-归纳-应用；【反思】',
+  '政治':'【教学目标】认知与认同；【重难点】；【过程】情境-思辨-践行；【反思】',
+  '道德与法治':'【教学目标】认知与认同；【重难点】；【过程】情境-思辨-践行；【反思】',
+  '科学':'【教学目标】；【探究】；【重难点】；【过程】提问-假设-实验-结论；【反思】'
+};
+function viewPrep(c){const k=cur();const rows=k.prep.map(p=>`<div class="rec"><div class="head"><span class="title">${esc(p.title)}</span>
+  <span><span class="tag">${esc(p.cls)}</span><span class="tag ${p.status==='已完成'?'green':'gray'}">${esc(p.status)}</span></span></div>
+  <div class="body">${esc(p.tpl||'（点击编辑填写教案/反思）')}</div>${attChips(p)}
+  <div class="foot"><button class="btn blue sm" onclick="editPrep(${p.id})">编辑/模板</button>${attBtn('prep',p.id)}<button class="btn red sm" onclick="delPrep(${p.id})">删除</button></div></div>`).join('');
+  const kn=(k.knowledge||[]).slice(0,5).map(e=>`<span class="tag">${esc(e.title)}</span>`).join('');
+  c.innerHTML=`<div class="view-title">✎ 备课中心</div><div class="view-desc">教案备课与教学反思，提供按学科模板快速生成框架，并联动本学科知识点库。</div>
+  <div class="row-actions"><button class="btn green" onclick="addPrep()">+ 新建备课</button>
+    <button class="btn blue" onclick="tplPrep()">套用${esc(cur().subject)}模板</button></div>
+  <div class="panel" style="margin-top:10px"><div class="sec-title">本单元关联知识点</div><div>${kn||'暂未关联'}</div></div>
+  <div class="card-list">${rows||'<div class="empty">暂无备课，点击新建或套用模板</div>'}</div>`;}
+function addPrep(){const t=prompt('备课主题：');if(!t)return;cur().prep.push({id:uid(),title:t,cls:cur().subject,status:'草稿',tpl:'',attachments:[]});save();viewPrep($('content'));}
+function tplPrep(){const k=cur();const t=(PREP_TPL[k.subject]||PREP_TPL['科学']);const txt=Array.isArray(t)?t[0]:t;
+  k.prep.push({id:uid(),title:k.subject+' 课时备课（模板）',cls:k.subject,status:'草稿',tpl:txt,attachments:[]});save();viewPrep($('content'));}
+function editPrep(id){const k=cur();const p=k.prep.find(x=>x.id===id);if(!p){handleErr('未找到该备课记录，请刷新后重试');return;}
+  const t=(PREP_TPL[k.subject]||PREP_TPL['科学']);const txt=Array.isArray(t)?t[0]:t;
+  modal(`<h3>编辑备课 · ${esc(p.title)}</h3>
+  <div class="field"><label>标题</label><input id="pp_t" value="${esc(p.title)}"></div>
+  <div class="field"><label>状态</label><select id="pp_s"><option ${p.status==='草稿'?'selected':''}>草稿</option><option ${p.status==='已完成'?'selected':''}>已完成</option></select></div>
+  <div class="field"><label>教案/反思（可套用模板）</label><textarea id="pp_tpl" style="height:160px">${esc(p.tpl||txt)}</textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button>
+  <button class="btn green" onclick="savePrep(${id})">保存</button></div>`);}
+function savePrep(id){const k=cur();const p=k.prep.find(x=>x.id===id);if(!p){handleErr('未找到该备课记录，请刷新后重试');return;}
+  p.title=$('pp_t').value;p.status=$('pp_s').value;p.tpl=$('pp_tpl').value;save();closeModal();viewPrep($('content'));}
+function delPrep(id){if(!confirm('确定删除该备课记录？'))return;const k=cur();const p=k.prep.find(x=>x.id===id);
+  if(p)attPurge(p);
+  k.prep=k.prep.filter(p=>p.id!==id);save();viewPrep($('content'));}
+function viewResearch(c){const k=cur();const list=k.research.map(r=>`<div class="rec"><div class="head"><div><div class="title">${esc(r.title)}</div><div class="meta">${esc(r.date)} · ${esc(r.participants||'')}</div></div>
+  <span class="tag green">${esc(r.type||'教研组')}</span></div><div class="body">${esc(r.note||'')}</div>${attChips(r)}
+  <div class="foot"><button class="btn blue sm" onclick="editResearch(${r.id})">编辑</button>${attBtn('research',r.id)}<button class="btn red sm" onclick="delResearch(${r.id})">删除</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">♢ 教学教研</div><div class="view-desc">集体备课、听评课、专题研讨记录，随时增删改查。</div>
+  <div class="row-actions"><button class="btn green" onclick="newResearch()">+ 新建教研记录</button></div><div class="card-list">${list||'<div class="empty">暂无记录</div>'}</div>`;}
+function newResearch(){modal(`<h3>新建教研记录</h3><div class="field"><label>标题</label><input id="rr_t"></div>
+  <div class="field"><label>类型</label><input id="rr_type" value="教研组"></div><div class="field"><label>日期</label><input id="rr_d" value="2026-11-09"></div>
+  <div class="field"><label>参与人</label><input id="rr_p"></div><div class="field"><label>笔记</label><textarea id="rr_n"></textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveResearch('null')">保存</button></div>`);}
+function editResearch(id){const r=cur().research.find(x=>x.id===id);if(!r){handleErr('未找到该教研记录，请刷新后重试');return;}
+  modal(`<h3>编辑教研记录</h3>
+  <div class="field"><label>标题</label><input id="rr_t" value="${esc(r.title)}"></div><div class="field"><label>类型</label><input id="rr_type" value="${esc(r.type)}"></div>
+  <div class="field"><label>日期</label><input id="rr_d" value="${r.date}"></div><div class="field"><label>参与人</label><input id="rr_p" value="${esc(r.participants||'')}"></div>
+  <div class="field"><label>笔记</label><textarea id="rr_n">${esc(r.note||'')}</textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveResearch(${id})">保存</button></div>`);}
+/* D10：新增判定与 saveClass/saveQuiz 统一为 null/undefined/'null' 三种 */
+function saveResearch(id){const d={title:$('rr_t').value,type:$('rr_type').value,date:$('rr_d').value,participants:$('rr_p').value,note:$('rr_n').value};if(!d.title){alert('请填写标题');return;}
+  const k=cur();
+  if(id===null||id===undefined||id==='null')k.research.push({id:uid(),...d,attachments:[]});
+  else{const r=k.research.find(x=>x.id===id);if(!r){handleErr('未找到要编辑的教研记录，请刷新后重试');return;}Object.assign(r,d);}
+  save();closeModal();viewResearch($('content'));}
+function delResearch(id){if(!confirm('确定删除该教研记录？'))return;const k=cur();const r=k.research.find(x=>x.id===id);
+  if(r)attPurge(r);
+  k.research=k.research.filter(x=>x.id!==id);save();viewResearch($('content'));}
+
+/* ---- 教学课表（V2-3：可编辑单元格 + 调代课记录） ---- */
+function viewTimetable(c){const k=cur();const t=k.timetable||defaultTimetable(k);
+  if(!k.timetable)k.timetable=t;
+  const rows=t.slice(1).map((r,ri)=>`<tr><td><b>${esc(r[0])}</b></td>${r.slice(1).map((x,ci)=>`<td style="cursor:pointer" onclick="editCell(${ri+1},${ci+1})" title="点击编辑">${x?esc(x):'<span style=\"color:#cbd5e1\">＋</span>'}</td>`).join('')}</tr>`).join('');
+  const substRows=(k.subst||[]).map(s=>`<div class="rec"><div class="head"><span class="title">${esc(s.date)} · ${esc(s.section)} · <span class="tag ${s.type==='代课'?'green':'amber'}">${s.type}</span></span>
+    <span class="tag gray">${esc(s.original||'—')}</span></div><div class="body">调整说明：${esc(s.note||'')}</div>
+    <div class="foot"><button class="btn red sm" onclick="delSubst(${s.id})">删除</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">▤ 教学课表</div><div class="view-desc">${esc(k.name)} 周课表（${esc(k.subject)}）。点击任意单元格即可编辑科目/教师，下方记录调课与代课。</div>
+  <div class="panel"><table><tr>${t[0].map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${rows}</table></div>
+  <div class="row-actions" style="margin-top:16px"><button class="btn blue" onclick="addSubst()">+ 登记调代课</button></div>
+  <div class="card-list"><div class="sec-title">调代课记录（${k.subst?k.subst.length:0}）</div>${substRows||'<div class="empty">暂无调代课记录</div>'}</div>`;}
+/* D04：重写 TDZ 缺陷（原 const cur=v=... 遮蔽全局 cur() 且 v 未初始化），并加越界判空 */
+function editCell(r,c){const k=cur();if(!Array.isArray(k.timetable)||!Array.isArray(k.timetable[r])||k.timetable[r][c]===undefined){handleErr('课表单元格不存在，请刷新后重试');return;}
+  const old=k.timetable[r][c]||'';const v=prompt('编辑该课（科目/教师，留空清空）：',old);if(v===null)return;
+  k.timetable[r][c]=v;save();viewTimetable($('content'));}
+function addSubst(){const k=cur();modal(`<h3>登记调代课</h3>
+  <div class="field"><label>日期</label><input id="sb_d" value="${new Date().toISOString().slice(0,10)}"></div>
+  <div class="field"><label>节次</label><input id="sb_sec" placeholder="如 周一第三节"></div>
+  <div class="field"><label>原课程内容</label><input id="sb_o" value="${k.subject}"></div>
+  <div class="field"><label>类型</label><select id="sb_t"><option>调课</option><option>代课</option></select></div>
+  <div class="field"><label>说明</label><textarea id="sb_n" placeholder="如 与周三第二节对调 / 由王老师代课"></textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveSubst()">保存</button></div>`);}
+function saveSubst(){const k=cur();k.subst=k.subst||[];k.subst.push({id:uid(),date:$('sb_d').value,section:$('sb_sec').value,original:$('sb_o').value,type:$('sb_t').value,note:$('sb_n').value});save();closeModal();viewTimetable($('content'));}
+function delSubst(id){if(!confirm('确定删除该调代课记录？'))return;const k=cur();k.subst=k.subst.filter(s=>s.id!==id);save();viewTimetable($('content'));}
+
+/* ---- 班级设置（新增任教班级 / 学段→年级→教材→学科） ---- */
+function viewClassSettings(c){const list=DB.classes.map(k=>`<div class="rec"><div class="head"><span class="title">${esc(k.name)}</span>
+  <span><span class="tag">${esc(k.stage)}</span><span class="tag">${esc(k.grade)}</span><span class="tag">${esc(k.subject)}</span><span class="tag gray">${esc(k.edition)}</span></span></div>
+  <div class="foot"><button class="btn blue sm" onclick="switchClass(${k.id})">切换</button><button class="btn ghost sm" onclick="openClassForm(${k.id})">编辑</button>
+  <button class="btn red sm" onclick="delClass(${k.id})">删除</button></div></div>`).join('');
+  const trashList=(DB.trash||[]).map((t,i)=>`<div class="rec"><div class="head"><span class="title">${esc(t.data.name)} <span class="tag gray">删除于 ${new Date(num(t.deletedAt,Date.now())).toLocaleDateString('zh-CN')}</span></span>
+  <span><span class="tag">${esc(t.data.stage)}</span><span class="tag">${esc(t.data.subject)}</span></span></div>
+  <div class="foot"><button class="btn green sm" onclick="restoreClass(${i})">恢复</button>
+  <button class="btn red sm" onclick="purgeClass(${i})">彻底删除</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">⚙ 班级设置</div><div class="view-desc">管理你的任教班级：可新增多个班级，每个班级独立设置 学段→年级→教材版本→学科，数据互不干扰。删除的班级进入回收站，30 天内可恢复。</div>
+  <div class="row-actions"><button class="btn green" onclick="openClassForm(null)">+ 新增任教班级</button></div><div class="card-list">${list}</div>
+  <div class="card-list" style="margin-top:16px"><div class="sec-title">🗑 回收站（${(DB.trash||[]).length}）· 30 天后自动清理</div>${trashList||'<div class="empty">回收站为空</div>'}</div>`;}
+function switchClass(id){DB.currentClassId=id;save();curView='总览';buildMenu();render();}
+function delClass(id){if(DB.classes.length<=1){alert('至少保留一个班级');return;}if(!confirm('删除该班级？删除后进入回收站，30 天内可恢复。'))return;
+  const k=DB.classes.find(x=>x.id===id);if(!k)return;
+  DB.trash=DB.trash||[];DB.trash.push({data:k,deletedAt:Date.now()});
+  DB.classes=DB.classes.filter(x=>x.id!==id);if(DB.currentClassId===id)DB.currentClassId=DB.classes[0].id;
+  save();render();}
+/* 回收站：恢复 / 彻底删除 / 30 天自动清理 */
+/* D14：恢复时 id 冲突重新分配，避免切换/编辑错对象 */
+function restoreClass(i){const t=(DB.trash||[])[i];if(!t||!t.data){handleErr('该回收站记录已损坏，无法恢复');return;}
+  const c=normalizeClass(JSON.parse(JSON.stringify(t.data)));
+  /* 恢复时若 id 与现有班级冲突则重新分配，避免切换/编辑/删除错对象 */
+  if(DB.classes.some(x=>x.id===c.id))c.id=uid();
+  DB.classes.push(c);DB.trash.splice(i,1);save();render();alert('已恢复班级「'+c.name+'」');}
+function purgeClass(i){if(!confirm('彻底删除后无法恢复，确定继续？'))return;DB.trash.splice(i,1);save();render();}
+function purgeOldTrash(){DB.trash=purgeTrash(DB.trash);}
+/* 学段查表：未命中或结构异常（导入旧数据 / registerSubject 新增学段）时回退默认配置，
+   并给出可读提示，避免 STAGES[st].grades / .subjects 直接解引用导致崩溃 */
+function stageCfg(st){const cfg=STAGES[st];
+  if(cfg&&Array.isArray(cfg.grades)&&Array.isArray(cfg.subjects))return cfg;
+  handleErr('未识别的学段「'+(st||'')+'」，已回退到小学默认配置');
+  return STAGES['小学'];}
+function openClassForm(id){const e=!!id;const k=e?DB.classes.find(x=>x.id===id):null;
+  if(e&&!k){handleErr('未找到该班级，可能已被删除，请刷新后重试');return;}
+  const stageOpts=Object.keys(STAGES).map(s=>`<option ${k&&k.stage===s?'selected':''}>${s}</option>`).join('');
+  const edOpts=EDITIONS.map(s=>`<option ${k&&k.edition===s?'selected':''}>${s}</option>`).join('');
+  /* 新增时传字符串 'null'（与 saveResearch 的既有约定一致），编辑时仍传数字 id；
+     此前 ${id||'null'} 会生成裸 null 字面量，与 saveClass 的 id==='null' 判定不匹配而误入编辑分支 */
+  modal(`<h3>${e?'编辑班级':'新增任教班级'}</h3>
+  <div class="field"><label>班级名称</label><input id="c_name" value="${e?esc(k.name):''}" placeholder="如 高一(1)班"></div>
+  <div class="field"><label>学段</label><select id="c_stage" onchange="updGrade()">${stageOpts}</select></div>
+  <div class="field"><label>年级</label><select id="c_grade"></select></div>
+  <div class="field"><label>教材版本</label><select id="c_ed">${edOpts}</select></div>
+  <div class="field"><label>学科</label><select id="c_sub"></select></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveClass(${id?id:"'null'"})">保存</button></div>`);
+  if(e){const cfg=stageCfg(k.stage);$('c_grade').innerHTML=cfg.grades.map(g=>`<option ${g===k.grade?'selected':''}>${g}</option>`).join('');
+    $('c_sub').innerHTML=cfg.subjects.map(s=>`<option ${s===k.subject?'selected':''}>${s}</option>`).join('');}
+  else updGrade();}
+function updGrade(){const st=$('c_stage').value;const cfg=stageCfg(st);
+  $('c_grade').innerHTML=cfg.grades.map(g=>`<option>${g}</option>`).join('');
+  $('c_sub').innerHTML=cfg.subjects.map(s=>`<option>${s}</option>`).join('');}
+/* 编辑班级时若学段/学科变更，重算学科派生内容（知识点/题型/雷达/资源/题库/课表学科名），
+   并保留成绩、学生、备课、作业、教研、家校、错题、调代课等全部用户数据 */
+/* D08：学科/学段变更时重算派生内容并保留用户数据，详见上方注释 */
+function refreshSubjectContent(k,oldSubject,o){
+  const tpl=makeClass({name:k.name,stage:o.stage,grade:o.grade,subject:o.subject,edition:o.edition});
+  k.kp=tpl.kp;k.types=tpl.types;k.radar=tpl.radar;k.knowledge=tpl.knowledge;
+  const seen=new Set((k.resources||[]).map(r=>String(r.name)+'|'+String(r.url)));
+  tpl.resources.forEach(r=>{const key=r.name+'|'+r.url;if(!seen.has(key)){k.resources.push(r);seen.add(key);}});
+  const userQ=(k.quizzes||[]).filter(q=>!(q.title||'').includes('示例'));
+  k.quizzes=userQ.concat(tpl.quizzes);
+  if(Array.isArray(k.timetable))k.timetable.forEach(row=>{if(Array.isArray(row))row.forEach((v,i)=>{if(v===oldSubject)row[i]=o.subject;});});
+  [k.mistakes,k.homework,k.prep].forEach(arr=>(arr||[]).forEach(x=>{if(x.subj===oldSubject)x.subj=o.subject;if(x.cls===oldSubject)x.cls=o.subject;}));
+  dedupeIds(k.quizzes);dedupeIds(k.resources);
+}
+/* D08/D20：学段结构与 stageCfg 同级校验；编辑换学科触发重算；统一刷新导航与下拉 */
+function saveClass(id){const name=$('c_name').value||($('c_grade').value+$('c_sub').value+'班');
+  let stage=$('c_stage').value;let subject=$('c_sub').value;
+  /* 用 stageCfg 同级的结构校验，避免「存在但结构损坏」的学段被放过 */
+  if(!STAGES[stage]||!Array.isArray(STAGES[stage].grades)||!Array.isArray(STAGES[stage].subjects)){handleErr('学段「'+(stage||'')+'」未配置或结构异常，已回退到小学');stage='小学';}
+  /* B1 防御：学科必须属于该学段（UI 已按学段过滤，此处兜底防止异常/越权数据写入） */
+  if(STAGES[stage]&&Array.isArray(STAGES[stage].subjects)&&!STAGES[stage].subjects.includes(subject)){
+    handleErr('学科「'+(subject||'')+'」不属于学段「'+stage+'」，已调整为该学段默认学科');
+    subject=STAGES[stage].subjects[0];
+  }
+  if(!SUBJECTS[subject])handleErr('学科「'+(subject||'')+'」暂无画像配置，已使用默认学科配置');
+  const o={name,stage,grade:$('c_grade').value,edition:$('c_ed').value,subject};
+  /* 兼容三种「新增」实参：字符串 'null'（当前模板）、裸 null/undefined（历史调用） */
+  if(id===null||id===undefined||id==='null'){const k=makeClass(o);DB.classes.push(k);DB.currentClassId=k.id;}
+  else{const k=DB.classes.find(x=>x.id===id);if(!k){handleErr('未找到要编辑的班级，请刷新后重试');return;}
+    const oldSubject=k.subject,changed=(k.stage!==o.stage||k.subject!==o.subject);
+    Object.assign(k,o);
+    if(changed)refreshSubjectContent(k,oldSubject,o);}
+  save();closeModal();curView='班级设置';buildMenu();render();}
+
+/* ---- 家校沟通（通知 / 打卡 / 沟通记录，对应「管」） ---- */
+function viewFamily(c){const k=cur();const rows=(k.family||[]).map(f=>`<tr><td><span class="tag ${f.type==='通知'?'blue':(f.type==='打卡'?'green':'gray')}">${esc(f.type)}</span></td>
+  <td>${esc(f.title)}</td><td>${esc(f.date)}</td><td><span class="tag ${f.status==='已读'||f.status==='已送达'?'green':'amber'}">${esc(f.status)}</span></td>
+  <td><button class="btn blue sm" onclick="deliverFamily(${f.id})">触达</button>
+  <button class="btn ghost sm" onclick="markFamily(${f.id})">标记送达</button>
+  <button class="btn red sm" onclick="delFamily(${f.id})">删除</button></td></tr>`).join('');
+  c.innerHTML=`<div class="view-title">✉ 家校沟通</div><div class="view-desc">${esc(k.name)} 的通知发布、习惯打卡与家校沟通记录（对应工作流「管」）。随账号云端同步，保护隐私；可一键「触达」家长（分享/短信/导出），真实通道需绑定服务商。</div>
+  <div class="row-actions"><button class="btn green" onclick="addFamily()">+ 新增沟通</button>
+    <button class="btn blue" onclick="tplNotice()">通知模板</button>
+    <button class="btn purple" onclick="batchNotice()">批量生成家长通知书</button>
+    <button class="btn ghost" onclick="exportNoticeTxt()">导出家长通知</button></div>
+  <div class="panel"><table><tr><th>类型</th><th>内容</th><th>日期</th><th>状态</th><th>操作</th></tr>${rows||'<tr><td colspan=5 class="empty">暂无记录</td></tr>'}</table></div>`;}
+function addFamily(){const t=prompt('主题：');if(!t)return;const type=prompt('类型（通知/打卡/沟通）：','通知')||'通知';
+  cur().family.push({id:uid(),type,title:t,date:new Date().toISOString().slice(0,10),status:'待发送'});save();viewFamily($('content'));}
+function markFamily(id){const f=cur().family.find(x=>x.id===id);if(!f){handleErr('未找到该沟通记录，请刷新后重试');return;}
+  f.status='已送达';save();viewFamily($('content'));}
+function tplNotice(){const k=cur();const t=`【${k.name} 通知】各位家长好：本周${k.subject}将进行阶段性练习，请提醒孩子整理错题本、按时完成分层作业；如有疑问可随时与我联系。谢谢配合！`;
+  modal(`<h3>通知模板</h3><div class="field"><textarea id="nt" style="height:160px">${esc(t)}</textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button>
+  <button class="btn green" onclick="cur().family.push({id:uid(),type:'通知',title:'阶段性练习提醒',date:new Date().toISOString().slice(0,10),status:'待发送'});save();closeModal();viewFamily($('content'))">保存为记录</button></div>`);}
+function deliverFamily(id){const k=cur();const f=k.family.find(x=>x.id===id);if(!f){handleErr('未找到该沟通记录，请刷新后重试');return;}const text=`【${k.name}·${k.subject}】${f.type}：${f.title}（${f.date}）`;
+  familyDeliverUI(text,()=>{f.status='已送达';save();viewFamily($('content'));});}
+/* 触达 UI：复制 / 系统分享 / 短信 / 导出；本地优先，真实通道需绑定服务商 */
+function familyDeliverUI(text,onSent){modal(`<h3>📤 触达家长</h3>
+  <div class="field"><label>通知内容（复制后可通过微信/短信发送）</label><textarea id="dvText" style="height:150px">${esc(text)}</textarea></div>
+  <div class="field"><label>接收方（家长称呼，留空表示全体）</label><input id="dvTo" placeholder="如：张三家长"></div>
+  <div class="tip">说明：本工具为本地优先，不内置短信/微信通道。可通过「系统分享」调用手机微信/短信，或复制后手动发送；「标记送达」用于本地留痕。</div>
+  <div class="foot" style="flex-wrap:wrap">
+    <button class="btn ghost" onclick="copyText($('dvText').value)">复制</button>
+    <button class="btn ghost" onclick="shareText($('dvText').value)">系统分享</button>
+    <button class="btn ghost" onclick="location.href='sms:?body='+encodeURIComponent($('dvText').value)">发短信</button>
+    <button class="btn green" id="dvSent">标记送达并关闭</button>
+  </div>`);
+  const mb=document.getElementById('dvSent'); if(mb){mb.onclick=()=>{closeModal();if(onSent)onSent();};}
+}
+/* 统一复制入口：clipboard 不可用时如实提示，不再给出「已复制」的假成功反馈 */
+/* D17：clipboard 不可用时如实提示，消除「已复制」假成功 */
+function copyText(t){if(navigator.clipboard&&typeof navigator.clipboard.writeText==='function'){
+    const p=navigator.clipboard.writeText(t);
+    if(p&&typeof p.then==='function')p.then(()=>alert('已复制到剪贴板')).catch(()=>alert('复制失败，请手动选择文本复制'));
+    else alert('已复制到剪贴板');return;}
+  alert('当前环境不支持自动复制，请手动选择文本复制');}
+function shareText(t){if(navigator.share&&typeof navigator.share==='function'){
+    const p=navigator.share({text:t});if(p&&typeof p.catch==='function')p.catch(()=>copyText(t));return;}
+  copyText(t);}
+/* D09：满分取 scores[0].full（exam 本身无 full 字段），缺失回退 100 */
+function batchNotice(){const k=cur();const last=k.exams[k.exams.length-1];if(!last){alert('暂无测评数据，无法生成成绩通知');return;}
+  /* 满分取自学生成绩记录（exam 本身无 full 字段），缺失时回退 100 */
+  const full=num((last.scores[0]||{}).full,100)||100;
+  const lines=k.students.map(s=>{const sc=last.scores.find(x=>x.name===s.name);const v=num(sc?sc.total:0,0);const tag=v<60?'预警（需重点帮扶）':(v>=85?'表现优秀':'正常');
+    return `${s.name}家长您好：${last.name}，${s.name}得分 ${v} 分（满分 ${full}），班级平均 ${num(last.avg,0)} 分，状态：${tag}。`;});
+  modal(`<h3>批量生成家长通知书</h3><div class="field"><label>按学生成绩生成的家长通知（可逐条复制/分享/导出）</label><textarea id="bnText" style="height:240px">${esc(lines.join('\n'))}</textarea></div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button>
+  <button class="btn green" onclick="shareText($('bnText').value)">系统分享/复制</button>
+  <button class="btn blue" onclick="exportText($('bnText').value,'家长通知书.txt')">导出 txt</button></div>`);}
+function exportNoticeTxt(){const k=cur();const lines=(k.family||[]).map(f=>`【${f.type}·${f.date}·${f.status}】${f.title}`);if(!lines.length){alert('暂无沟通记录');return;}
+  exportText(lines.join('\n'),k.name+'_家校沟通.txt');}
+/* D18：导出后释放 ObjectURL，异常交 handleErr */
+function exportText(text,name){try{const a=document.createElement('a');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+  a.href=url;a.download=name;a.click();setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(_){}},1000);
+}catch(e){handleErr('导出失败：'+(e&&e.message||e));}}
+function delFamily(id){if(!confirm('确定删除该沟通记录？'))return;const k=cur();k.family=k.family.filter(f=>f.id!==id);save();viewFamily($('content'));}
+
+/* ---- 成绩录入 / 导出 ---- */
+function editExam(){const k=cur();const last=k.exams[k.exams.length-1];if(!last){alert('暂无测评数据，请先新建测评');return;}
+  const rows=(last.scores||[]).map((s,i)=>`<tr><td>${esc(s.name)}</td><td><input style="width:70px" id="sc${i}" value="${num(s.total,0)}"></td><td>/ ${num(s.full,100)}</td></tr>`).join('');
+  modal(`<h3>录入成绩 · ${esc(last.name)}</h3><table><tr><th>姓名</th><th>总分</th><th></th></tr>${rows}</table>
+  <div class="foot"><button class="btn ghost" onclick="closeModal();render()">完成</button></div>`);
+  // 重新计算
+  setTimeout(()=>{const btn=$('modal').querySelector('.foot .btn.ghost');if(btn)btn.onclick=()=>{last.scores.forEach((s,i)=>s.total=num($('sc'+i).value,0));last.avg=+(last.scores.reduce((a,b)=>a+num(b.total,0),0)/Math.max(1,last.scores.length)).toFixed(1);save();closeModal();render();};},0);}
+/* D13/D13b：空测评兜底 + 标准 CSV 转义（引号加倍）+ revokeObjectURL */
+function exportExam(){const k=cur();const last=k.exams[k.exams.length-1];if(!last){alert('暂无测评数据可导出');return;}
+  /* 标准 CSV 转义：字段包裹双引号、内部双引号加倍，防止姓名含逗号/引号破坏结构 */
+  const cell=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const rows=[['姓名','总分','满分']];(last.scores||[]).forEach(s=>rows.push([s.name,num(s.total,0),num(s.full,100)]));
+  try{const csv='\ufeff'+rows.map(r=>r.map(cell).join(',')).join('\r\n');const a=document.createElement('a');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=url;a.download=k.subject+'_成绩.csv';a.click();
+    setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(_){}},1000);
+  }catch(e){handleErr('导出成绩失败：'+(e.message||e));}}
+
+/* ---- 课堂互动 ---- */
+let timerInt=null,tLeft=180,curGroups=[],groupScores={};
+function viewInteraction(c){updateTimer();const k=cur();
+  const quizList=(k.quizzes||[]).map(q=>`<div class="rec" style="padding:10px 12px"><div class="head"><span class="title" style="font-size:13.5px">${esc(q.title)}</span>
+    <span><span class="tag">${q.questions.length}题</span></span></div>
+    <div class="foot"><button class="btn blue sm" onclick="runLive(${q.id})">发起答题大屏</button>
+    <button class="btn ghost sm" onclick="editQuiz(${q.id})">编辑题库</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">✦ 课堂互动</div>
+  <div class="view-desc">随机点名、答题倒计时、分组抽签、小组计分板；并支持随堂测验即时正确率大屏（V2-5，对标雨课堂，即时本机统计）。</div>
+  <div class="grid2">
+    <div class="panel"><h3>随机点名</h3><div id="pickName" style="font-size:26px;font-weight:800;text-align:center;padding:18px;color:var(--purple)">点击抽取</div>
+      <div style="text-align:center;display:flex;gap:8px;justify-content:center"><button class="btn blue" onclick="pick()">抽取</button><button class="btn ghost" onclick="pick()">再抽</button></div></div>
+    <div class="panel"><h3>答题倒计时</h3><div id="timer" style="font-size:44px;font-weight:800;text-align:center;padding:8px">03:00</div>
+      <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn ghost sm" onclick="setTimer(60)">60s</button>
+      <button class="btn ghost sm" onclick="setTimer(180)">3min</button><button class="btn ghost sm" onclick="setTimer(300)">5min</button>
+      <button class="btn green" onclick="startTimer()">开始</button><button class="btn ghost" onclick="resetTimer()">重置</button></div></div>
+    <div class="panel"><h3>分组抽签</h3><div style="margin-bottom:10px"><button class="btn blue" onclick="divideGroups()">随机分成 N 组</button></div>
+      <div id="groupBox" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div></div>
+    <div class="panel"><h3>小组计分板</h3><div style="margin-bottom:8px;font-size:12px;color:var(--muted)">先分组，再用 ± 实时计分。</div><div id="scoreBox"></div></div>
+  </div>
+  <div class="panel" style="margin-top:16px"><div class="sec-title">随堂测验（即时正确率大屏）</div>
+    <div class="row-actions"><button class="btn green sm" onclick="newQuiz()">+ 新建随堂题</button></div>
+    <div class="card-list" style="gap:8px">${quizList||'<div class="empty">暂无题库，点击新建</div>'}</div></div>`;renderGroups();}
+/* 随堂测验：逐题收集各选项人数 → 即时正确率大屏 */
+let liveState=null;
+/* D22：空题库与空 liveState 全链路防御 */
+function runLive(id){const k=cur();const qz=k.quizzes.find(x=>x.id===id);if(!qz){handleErr('未找到该测验，请刷新后重试');return;}
+  if(!qz.questions||!qz.questions.length){alert('该测验暂无题目，请先编辑题库');return;}
+  liveState={qz,idx:0,counts:{}};showLive();showLiveQuestion();}
+function showLiveQuestion(){const s=liveState;if(!s||!s.qz)return;const q=s.qz.questions[s.idx];const total=s.qz.questions.length;
+  if(!q){closeLive();return;}
+  let opts;if(q.type==='choice'){opts=q.options&&q.options.length?q.options.map((o,i)=>String.fromCharCode(65+i)+'. '+o):['A','B','C','D'];}
+  else{opts=['正确','错误'];}
+  $('liveTitle').textContent=`${s.qz.title} · 第 ${s.idx+1}/${total} 题`;
+  $('liveBody').innerHTML=`<div style="font-size:15px;color:#9aa6c0;margin-bottom:10px">${s.idx+1}. ${esc(q.q)}</div>
+    <div style="font-size:26px;font-weight:800;margin-bottom:18px;text-align:center;max-width:900px">${esc(q.q)}</div>
+    <div id="optBox" style="display:grid;grid-template-columns:repeat(${opts.length},1fr);gap:14px;max-width:900px;width:100%">
+    ${opts.map((o,i)=>`<div style="border:2px solid #374151;border-radius:14px;padding:16px;text-align:center;cursor:pointer" onclick="setOptCount(${i})">
+      <div style="font-size:30px;font-weight:800;color:#60a5fa">${String.fromCharCode(65+i)}</div><div style="font-size:13px;color:#cbd5e1;margin:6px 0">${esc(o.replace(/^[A-D]\.\s*/,''))}</div>
+      <div id="oc${i}" style="font-size:34px;font-weight:800;color:#fff">0</div><div style="font-size:12px;color:#9aa6c0">人</div></div>`).join('')}</div>
+    <div style="margin-top:22px;display:flex;gap:12px">
+      <button class="btn ghost" onclick="liveResetCounts()">清空</button>
+      <button class="btn blue" onclick="livePrev()">上一题</button>
+      <button class="btn green" onclick="liveNext()">${s.idx<total-1?'下一题':'查看正确率'}</button></div>`;
+  // 恢复已录入人数
+  (s.counts[s.idx]||[]).forEach((v,i)=>{const el=$('oc'+i);if(el)el.textContent=v;});}
+function setOptCount(i){const el=$('oc'+i);if(!el){handleErr('作答面板已关闭，请重新发起答题');return;}
+  const cur=+(el.textContent||0);const v=prompt('选择该项的人数：',cur);if(v===null)return;el.textContent=(+v||0);}
+function liveResetCounts(){if(!liveState||!liveState.qz)return;liveState.counts[liveState.idx]=[];
+  const q=liveState.qz.questions[liveState.idx];if(!q)return;
+  (q.options||['A','B','C','D']).forEach((_,i)=>{const el=$('oc'+i);if(el)el.textContent=0;});}
+function livePrev(){if(liveState&&liveState.idx>0){liveState.idx--;showLiveQuestion();}}
+function liveNext(){if(!liveState||!liveState.qz)return;const q=liveState.qz.questions[liveState.idx];const n=liveState.qz.questions.length;if(!q)return;
+  // 保存当前人数
+  liveState.counts[liveState.idx]=(q.options||['A','B','C','D']).map((_,i)=>+($('oc'+i).textContent||0));
+  if(liveState.idx<n-1){liveState.idx++;showLiveQuestion();}else showLiveResult();}
+function showLiveResult(){const s=liveState;if(!s||!s.qz)return;const q=s.qz.questions[s.idx];if(!q)return;const counts=s.counts[s.idx]||[];
+  const total=counts.reduce((a,b)=>a+b,0);const correctIdx=keyToIndex(q);const right=counts[correctIdx]||0;
+  const rate=total?Math.round(right/total*100):0;
+  const colors=['#60a5fa','#f87171','#fbbf24','#34d399'];
+  $('liveTitle').textContent=`${s.qz.title} · 第 ${s.idx+1} 题 正确率`;
+  $('liveBody').innerHTML=`<div style="font-size:20px;font-weight:700;margin-bottom:6px;text-align:center">${esc(q.q)}</div>
+    <div style="font-size:96px;font-weight:900;color:${rate>=60?'#34d399':'#f87171'};line-height:1.1">${rate}%</div>
+    <div style="font-size:16px;color:#cbd5e1;margin-bottom:18px">答对 ${right} / 共 ${total} 人${total?'（正确选项 '+String.fromCharCode(65+correctIdx)+'）':''}</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:900px">
+    ${(q.options||['A','B','C','D']).map((o,i)=>{const v=counts[i]||0;const pct=total?Math.round(v/total*100):0;
+      return `<div style="text-align:center"><div style="font-size:14px;color:#cbd5e1">${String.fromCharCode(65+i)} ${esc((o||'').replace(/^[A-D]\.\s*/,''))}</div>
+      <div style="width:120px;height:14px;background:#1f2937;border-radius:8px;overflow:hidden;margin-top:4px"><div style="height:100%;background:${colors[i%4]};width:${pct}%"></div></div>
+      <div style="font-size:22px;font-weight:800;margin-top:4px">${v}</div><div style="font-size:12px;color:#9aa6c0">${pct}%</div></div>`;}).join('')}</div>
+    <div style="margin-top:24px"><button class="btn blue" onclick="showLiveQuestion()">返回本题</button>
+    <button class="btn green" onclick="liveSummary()">整卷正确率</button></div>`;}
+function keyToIndex(q){if(q.type==='choice'){const k=String(q.key).trim().toUpperCase();const arr=(q.options||[]);const idx=arr.findIndex(o=>o.trim().toUpperCase().startsWith(k));return idx>=0?idx:0;}return 0;}
+function liveSummary(){const s=liveState;if(!s||!s.qz)return;let totRight=0,totAns=0;
+  s.qz.questions.forEach((q,i)=>{const counts=s.counts[i]||[];const total=counts.reduce((a,b)=>a+b,0);totAns+=total;totRight+=(counts[keyToIndex(q)]||0);});
+  const rate=totAns?Math.round(totRight/totAns*100):0;
+  $('liveTitle').textContent=`${s.qz.title} · 整卷正确率`;
+  $('liveBody').innerHTML=`<div style="font-size:18px;color:#cbd5e1;margin-bottom:8px">${s.qz.questions.length} 题 · 全班累计作答 ${totAns} 人次</div>
+    <div style="font-size:110px;font-weight:900;color:${rate>=60?'#34d399':'#f87171'}">${rate}%</div>
+    <div style="font-size:16px;color:#cbd5e1">整卷平均正确率（答对 ${totRight} 人次）</div>
+    <div style="margin-top:24px"><button class="btn green" onclick="showLiveQuestion()">逐题回顾</button></div>`;}
+function openLive(){/* 兼容：直接展示首个测验大屏 */
+  const k=cur();if(!k.quizzes||!k.quizzes.length){alert('暂无题库');return;}runLive(k.quizzes[0].id);}
+function closeLive(){$('liveBody').innerHTML='';$('liveBg').classList.remove('show');}
+/* 复用：让全屏容器显示 */
+function showLive(){const lb=$('liveBg');if(lb)lb.classList.add('show');}
+function pick(){const s=cur().students;if(!s.length){alert('请先添加学生');return;}const el=$('pickName');const n=s[Math.floor(Math.random()*s.length)].name;el.style.opacity=0;setTimeout(()=>{el.textContent=n;el.style.opacity=1;},120);}
+function setTimer(s){clearInterval(timerInt);tLeft=s;updateTimer();}
+function updateTimer(){const m=String(Math.floor(tLeft/60)).padStart(2,'0'),s=String(tLeft%60).padStart(2,'0');const el=$('timer');if(el)el.textContent=m+':'+s;}
+function startTimer(){clearInterval(timerInt);timerInt=setInterval(()=>{if(tLeft<=0){clearInterval(timerInt);return;}tLeft--;updateTimer();},1000);}
+function resetTimer(){clearInterval(timerInt);updateTimer();}
+function divideGroups(){const n=+(prompt('分成几组？',2));if(!n||n<1)return;const arr=cur().students.map(s=>s.name);
+  for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  curGroups=Array.from({length:n},()=>[]);arr.forEach((nm,i)=>curGroups[i%n].push(nm));groupScores={};curGroups.forEach((g,i)=>groupScores[i]=0);renderGroups();}
+function renderGroups(){const box=$('groupBox');if(!box)return;box.innerHTML=curGroups.map((g,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:12px"><div style="font-weight:700;margin-bottom:6px">第${i+1}组 <span style="color:var(--blue);font-size:12px">（${g.length}人）</span></div><div style="font-size:12.5px;color:var(--muted);line-height:1.7">${esc(g.join('、'))||'—'}</div></div>`).join('');renderScoreboard();}
+function renderScoreboard(){const sb=$('scoreBox');if(!sb)return;sb.innerHTML=curGroups.length?curGroups.map((g,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-weight:700;width:56px">第${i+1}组</span><span id="gs${i}" style="font-size:22px;font-weight:800;color:var(--purple);width:48px;text-align:center">${groupScores[i]||0}</span><button class="btn red sm" onclick="addScore(${i},-1)">−</button><button class="btn green sm" onclick="addScore(${i},1)">＋</button></div>`).join(''):'<div class="empty">先「随机分成 N 组」</div>';}
+function addScore(i,d){groupScores[i]=(groupScores[i]||0)+d;$('gs'+i).textContent=groupScores[i];}
+
+/* ---- AI 助手（V2-1：支持接入大模型，内置规则回退） ---- */
+function viewAI(c){const cfg=DB.aiConfig||{};c.innerHTML=`<div class="view-title">🤖 AI 助手</div>
+  <div class="view-desc">本地备课辅助 + 智能批改（V2-1）。当前学科：${esc(cur().subject)}。${cfg.enabled?('已接入大模型：'+esc(cfg.model||cfg.endpoint)):'当前为内置规则版，可在「大模型配置」接入 API 以获得更强备课/评语能力。'}</div>
+  <div class="row-actions"><button class="btn blue" onclick="viewAiConfig()">大模型配置</button></div>
+  <div class="panel"><div id="aiLog" style="min-height:160px;font-size:13.5px;line-height:1.8"></div>
+  <div style="display:flex;gap:8px;margin-top:10px"><input id="aiQ" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:9px" placeholder="例如：如何讲清牛顿第二定律？">
+  <button class="btn blue" onclick="askAI()">提问</button></div></div>`;}
+/* 统一对话入口：若配置大模型则调用接口，否则使用内置规则 */
+/* D21：超时定时器在 finally 清理；messages 与空问题判空 */
+async function aiChat(messages){const cfg=DB.aiConfig||{};
+  const lastQ=(messages&&messages.length)?String(messages[messages.length-1].content||''):'';
+  if(cfg.enabled&&cfg.endpoint){
+    let to=null;
+    try{const ctrl=new AbortController();to=setTimeout(()=>ctrl.abort(),12000);
+      const headers={'Content-Type':'application/json'};if(cfg.key)headers['Authorization']='Bearer '+cfg.key;
+      const r=await fetch(cfg.endpoint,{method:'POST',headers,body:JSON.stringify({model:cfg.model||'gpt-3.5-turbo',messages:messages}),signal:ctrl.signal});
+      if(r.ok){const j=await r.json();const cc=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;if(cc)return cc.trim();}
+      return '(模型接口返回异常，已回退内置建议) '+aiReply(lastQ);
+    }catch(e){return '(接口不可用，已回退内置建议) '+aiReply(lastQ);}
+    finally{if(to)clearTimeout(to);}
+  }
+  return aiReply(lastQ);}
+function viewAiConfig(){const cfg=DB.aiConfig||{enabled:false,endpoint:'',key:'',model:''};
+  modal(`<h3>大模型配置（可选）</h3>
+  <div class="field"><label><input type="checkbox" id="ac_en" ${cfg.enabled?'checked':''}> 启用大模型 API</label></div>
+  <div class="field"><label>API 地址（如 https://api.openai.com/v1/chat/completions）</label><input id="ac_ep" value="${esc(cfg.endpoint||'')}"></div>
+  <div class="field"><label>模型名</label><input id="ac_m" value="${esc(cfg.model||'')}" placeholder="gpt-3.5-turbo"></div>
+  <div class="field"><label>API Key（仅存本机，不上传）</label><input id="ac_k" type="password" value="${esc(cfg.key||'')}"></div>
+  <div class="tip">密钥仅保存在本机浏览器，不会上传到第三方。未配置时 AI 助手与智能批改使用内置规则，功能同样可用。</div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn green" onclick="saveAiConfig()">保存</button></div>`);}
+function saveAiConfig(){DB.aiConfig={enabled:$('ac_en').checked,endpoint:$('ac_ep').value,key:$('ac_k').value,model:$('ac_m').value};
+  save();closeModal();viewAI($('content'));alert('已保存（仅本机）');}
+async function askAI(){const q=$('aiQ').value;if(!q)return;const log=$('aiLog');const rid='air'+(Date.now()+Math.floor(Math.random()*999));
+  log.innerHTML+=`<div style="margin:6px 0"><b>老师：</b>${esc(q)}</div><div style="margin:6px 0;color:#1e3a8a" id="${rid}">🤖 助手：思考中…</div>`;log.scrollTop=log.scrollHeight;
+  const a=await aiChat([{role:'user',content:q}]);const el=document.getElementById(rid);if(el)el.textContent='🤖 助手：'+a;$('aiQ').value='';}
+function aiReply(q){q=String(q||'');if(q.includes('牛顿')||q.includes('受力'))return'步骤：1) 确定研究对象；2) 重力；3) 接触力；4) 不添不漏。可配合画图与受力分析练习。';
+  if(q.includes('阅读')||q.includes('作文')||q.includes('文言'))return'建议以"范文拆解+方法归纳+当堂练笔"三步推进，建立错题与好句积累本。';
+  if(q.includes('计算'))return'计算题丢分常因步骤不全，训练"列方程→代数据→带单位→写结论"的规范。';
+  return'已记录。联网版 AI 可结合教材、学情与资源库给出更精准的备课建议。';}
+
+/* ---- 帮助 ---- */
+function viewHelp(c){c.innerHTML=`<div class="view-title">? 帮助</div><div class="view-desc">在线订阅版 · 关于本工作台的使用与数据说明。</div>
+  <div class="panel"><h3>使用说明</h3><p style="font-size:13.5px;line-height:1.9">
+  • <b>小初高通用</b>：在「班级设置」新增任教班级，依次选择 学段 → 年级 → 教材版本 → 学科，工作台据此提供对应学科内容。<br>
+  • <b>在线订阅</b>：必须联网登录。新用户注册即享 <b>7 天免费试用</b>；到期后微信扫码支付 <b>20 元 / 月</b> 自动顺延一个月，可在用户授权后开通自动续费。账号、注册时间、试用到期、付费/续费状态、权限状态与使用期限全部保存在腾讯云数据库并由服务端校验，<b>不提供离线模式</b>。<br>
+  • <b>云端同步</b>：备课 / 作业 / 教研等业务数据登录后自动同步到腾讯云，换设备或重装安装包后登录即自动恢复；本机只保留缓存，断网时工作台会锁定。<br>
+  • <b>附件</b>：备课 / 作业 / 教研记录均可点「📎 附件」拍照或从本机选择图片、文档上传（单文件 ≤ 2 MB，大图自动压缩）；含类型/大小校验、上传中/成功/失败提示与失败重试，可预览图片或下载文件。附件内容保存在本机缓存，云端只同步附件清单，换设备需重新上传。<br>
+  • <b>多端安装</b>：提供 Windows / macOS / Linux 桌面安装包与 Android / iOS / HarmonyOS 移动安装包，均加载企业网站在线版；也可直接用浏览器访问 <b>https://www.cnxhy.top/teacher/</b>。<br>
+  • <b>后台管理</b>：网站后台可查询全部账号与订阅信息；为指定账号手动开通权限、设定使用期限、停用权限<b>仅能在企业网站后台完成</b>。</p>
+  <div class="muted-note">已上线能力：① 智能批改（客观题自动批改 + 主观题 AI/内置规则评语）；② 家校触达（通知可复制/系统分享/短信/导出，并标记送达）；③ 轻量排课（课表可编辑 + 调代课记录）；④ 云端数据同步（腾讯云，多设备自动恢复）；⑤ 随堂测验即时正确率大屏（对标雨课堂）。</div>
+  <div class="muted-note">数据保存在腾讯云数据库与本机缓存中，本工具需联网使用；更换设备登录同一账号即可恢复业务数据。权限开通、停用与期限设定由企业网站后台管理员负责。</div></div>`;}
+
+/* ============== V2-1 智能批改 AI ============== */
+/* D34：入口原本 onclick="viewGrading()" 未传容器，导致 c.innerHTML 抛
+   "Cannot set properties of undefined (setting 'innerHTML')"。
+   现统一由 goto('智能批改') 走 VIEWS 路由；此处兜底兼容外部/历史无参调用。 */
+function viewGrading(c){c=c||$('content');if(!c)return;const k=cur();
+  const list=(k.quizzes||[]).map(q=>`<div class="rec"><div class="head"><div><div class="title">${esc(q.title)}</div>
+    <div class="meta">${esc(q.subject||'')} · ${q.questions.length} 题（客观题自动批改）</div></div>
+    <span class="tag green">题库</span></div>
+    <div class="foot"><button class="btn blue sm" onclick="gradeQuiz(${q.id})">批改</button>
+    <button class="btn ghost sm" onclick="editQuiz(${q.id})">编辑</button>
+    <button class="btn red sm" onclick="delQuiz(${q.id})">删除</button></div></div>`).join('');
+  c.innerHTML=`<div class="view-title">🤖 智能批改</div>
+  <div class="view-desc">客观题（选择/填空）自动批改并统计正确率；主观题评语可由已配置的大模型生成，未配置时使用内置规则。题库与「课堂互动·随堂测验」共用。</div>
+  <div class="row-actions"><button class="btn green" onclick="newQuiz()">+ 新建测验</button></div>
+  <div class="card-list">${list||'<div class="empty">暂无题库，点击新建</div>'}</div>`;}
+function newQuiz(){quizForm(null);}
+function editQuiz(id){const qz=cur().quizzes.find(x=>x.id===id);if(!qz){handleErr('未找到该题库，请刷新后重试');return;}quizForm(qz);}
+function quizForm(qz){const e=!!qz;const q=qz||{title:'',subject:cur().subject,questions:[]};
+  const rows=q.questions.map((qq,i)=>quizRowHTML(i,qq)).join('');
+  modal(`<h3>${e?'编辑测验':'新建测验'}</h3>
+   <div class="field"><label>测验标题</label><input id="qz_t" value="${esc(q.title)}"></div>
+   <div class="field"><label>学科</label><input id="qz_s" value="${esc(q.subject)}"></div>
+   <div class="sec-title">题目</div><div id="qzRows">${rows}</div>
+   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button>
+     <button class="btn ghost" onclick="addQuizRow()">+ 添加题目</button>
+     <button class="btn green" onclick="saveQuiz(${e?qz.id:'null'})">保存</button></div>`);}
+function quizRowHTML(i,qq){qq=qq||{q:'',type:'choice',options:['A. 正确','B. 错误'],key:'A'};
+  const optVal=(qq.options||[]).join(' | ');
+  return `<div class="rec" style="padding:10px;margin-bottom:8px">
+    <div class="field" style="margin-bottom:6px"><label>第 ${i+1} 题题干</label><input class="q_q" value="${esc(qq.q)}"></div>
+    <div class="field" style="margin-bottom:6px"><label>题型</label><select class="q_t" onchange="qTypeChange(this)"><option value="choice" ${qq.type==='choice'?'selected':''}>选择</option><option value="blank" ${qq.type==='blank'?'selected':''}>填空</option></select></div>
+    <div class="q_opt_wrap" style="display:${qq.type==='choice'?'block':'none'}"><div class="field"><label>选项（用 | 分隔，如 A. 正确 | B. 错误）</label><input class="q_o" value="${esc(optVal)}"></div></div>
+    <div class="field" style="margin-bottom:4px"><label>正确答案${qq.type==='choice'?'（如 A）':'（填空文本）'}</label><input class="q_k" value="${esc(qq.key)}"></div>
+    <div style="text-align:right"><button class="btn red sm" onclick="this.closest('.rec').remove()">删除该题</button></div></div>`;}
+function qTypeChange(sel){const rec=sel.closest('.rec');const w=rec.querySelector('.q_opt_wrap');if(w)w.style.display=sel.value==='choice'?'block':'none';}
+function addQuizRow(){const box=$('qzRows');const i=box.querySelectorAll('.rec').length;box.insertAdjacentHTML('beforeend',quizRowHTML(i,null));}
+function saveQuiz(id){const rows=document.querySelectorAll('#qzRows .rec');const questions=[];let bad=false;
+  rows.forEach(r=>{const q=r.querySelector('.q_q').value.trim();const type=r.querySelector('.q_t').value;const key=r.querySelector('.q_k').value.trim();
+    let options=[];if(type==='choice'){options=(r.querySelector('.q_o').value||'').split('|').map(s=>s.trim()).filter(Boolean);if(!options.length)options=['A','B','C','D'];}
+    if(!q||!key){bad=true;}questions.push({q,type,key,options});});
+  if(bad){alert('题干与正确答案不能为空');return;}
+  const k=cur();const obj={title:$('qz_t').value||'未命名测验',subject:$('qz_s').value,questions};
+  /* 与 saveClass 同源：新增时模板可能传入裸 null，放宽判定并对查找结果判空 */
+  if(id===null||id===undefined||id==='null'){obj.id=uid();k.quizzes.push(obj);}
+  else{const qz=k.quizzes.find(x=>x.id===+id);if(!qz){handleErr('未找到要编辑的题库，请刷新后重试');return;}Object.assign(qz,obj);}
+  /* D34：保存后统一走路由 render()，避免从「课堂互动」建题时串到智能批改页面 */
+  save();closeModal();render();}
+function delQuiz(id){if(!confirm('确定删除该测验题库？'))return;const k=cur();k.quizzes=k.quizzes.filter(x=>x.id!==id);save();render();}
+function gradeQuiz(id){const k=cur();const qz=k.quizzes.find(x=>x.id===id);if(!qz){handleErr('未找到该题库，请刷新后重试');return;}
+  if(!qz.questions.length){alert('该测验暂无题目，请先编辑题库');return;}
+  const rows=k.students.map(s=>`<tr><td>${esc(s.name)}</td><td><input id="ans_${s.id}" style="width:180px" placeholder="按题序空格分隔，如 A B"></td><td id="res_${s.id}"></td>
+   <td><button class="btn ghost sm" onclick="aiCommentFor(${s.id},${id})">AI 评语</button></td></tr>`).join('');
+  modal(`<h3>🤖 智能批改 · ${esc(qz.title)}</h3>
+   <div class="muted-note">题序与答案：<br>${qz.questions.map((qq,i)=>(i+1)+'. ['+(qq.type==='choice'?'选择':'填空')+'] 正确答案 '+esc(qq.key)).join('；')}</div>
+   <div class="panel" style="margin-top:8px"><table><tr><th>学生</th><th>作答（空格分隔）</th><th>结果</th><th>评语</th></tr>${rows}</table></div>
+   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn green" onclick="runGrade(${id})">一键批改</button></div>`);}
+function runGrade(id){const k=cur();const qz=k.quizzes.find(x=>x.id===id);if(!qz)return;let sum=0;
+  k.students.forEach(s=>{const inp=$('ans_'+s.id);if(!inp)return;const raw=(inp.value||'').trim().split(/\s+/).filter(Boolean);
+    let right=0,wrong=[];qz.questions.forEach((qq,i)=>{const a=(raw[i]||'').trim();if(a&&a.toLowerCase()===String(qq.key).toLowerCase())right++;else wrong.push(i+1);});
+    const rate=Math.round(right/Math.max(1,qz.questions.length)*100);
+    const resEl=$('res_'+s.id);if(resEl)resEl.innerHTML=`<span class="tag ${rate>=60?'green':'red'}">${right}/${qz.questions.length} · ${rate}%</span>`+(wrong.length?`<div style="font-size:11px;color:var(--red);margin-top:2px">错 ${wrong.join(',')}</div>`:'');
+    sum+=rate;});
+  qz.lastAvg=Math.round(sum/Math.max(1,k.students.length));save();alert('批改完成，全班平均正确率 '+qz.lastAvg+'%');}
+async function aiCommentFor(studentId,quizId){const k=cur();const s=k.students.find(x=>x.id===studentId);const qz=k.quizzes.find(x=>x.id===quizId);if(!s||!qz)return;
+  const inp=$('ans_'+s.id);const raw=(inp?(inp.value||''):'').trim().split(/\s+/).filter(Boolean);let right=0,wrong=[];
+  qz.questions.forEach((qq,i)=>{const a=(raw[i]||'').trim();if(a&&a.toLowerCase()===String(qq.key).toLowerCase())right++;else wrong.push(i+1);});
+  const rate=Math.round(right/Math.max(1,qz.questions.length)*100);
+  const prompt=`你是中学${k.subject}教师助手。学生${s.name}本次「${qz.title}」客观题正确率 ${rate}%（答对 ${right}/${qz.questions.length}，错题序号：${wrong.join(',')||'无'}）。请写一段给该生的简短评语与改进建议（80字以内，语气鼓励）。`;
+  const a=await aiChat([{role:'user',content:prompt}]);
+  modal(`<h3>AI 评语 · ${esc(s.name)}（正确率 ${rate}%）</h3><div class="field"><textarea id="cmtAI" style="height:160px">${esc(a)}</textarea></div>
+   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn green" onclick="navigator.clipboard&&navigator.clipboard.writeText($('cmtAI').value);alert('已复制')">复制评语</button></div>`);}
+
+/* ============== 在线版云端数据同步（腾讯云 CloudBase） ==============
+ * 旧版本地加密备份导出 / 导入恢复 / 第三方网络盘同步已全部移除。
+ * 数据以登录账号为单位保存在云端：登录后自动拉取，保存时防抖推送，
+ * 断网即由 sub/gate.js 锁定工作台，不存在任何可离线使用的路径。
+ * ============================================================ */
+function viewSync(c){
+  const on=!!(window.ENT_SYNC&&window.__ENT_ALLOWED__);
+  const ver=on?window.ENT_SYNC.version():0;
+  const st=(on&&window.ENT_SYNC&&window.ENT_SYNC.status)?window.ENT_SYNC.status():{lastSync:null,lastError:null,lastErrorMsg:''};
+  const fmtSync=t=>{try{return new Date(t).toLocaleString('zh-CN',{hour12:false});}catch(e){return '—';}};
+  const syncInfo=!on?'未连接':(st.lastError?('最近失败：'+fmtSync(st.lastError)+(st.lastErrorMsg?('（'+esc(st.lastErrorMsg)+'）'):'')):(st.lastSync?('上次成功：'+fmtSync(st.lastSync)):'尚未同步'));
+  c.innerHTML=`<div class="view-title">☁ 云端数据同步</div>
+    <div class="view-desc">在线订阅版：备课 / 作业 / 教研等业务数据以登录账号为单位保存在<b>腾讯云数据库</b>，登录后自动拉取，编辑后自动同步；换设备或重装安装包登录同一账号即可恢复。本机仅保留缓存，<b>不提供离线模式与本地备份文件</b>。</div>
+    <div class="grid2">
+   <div class="panel"><h3>同步状态</h3>
+     <div class="field"><label>连接状态</label><div style="font-size:14px;padding:6px 0;color:${on?'#15803d':'#b91c1c'}">${on?'● 已连接腾讯云授权服务':'○ 未登录 / 连接已中断'}</div></div>
+     <div class="field"><label>云端数据版本</label><div style="font-size:14px;padding:6px 0">v ${esc(ver)}</div></div>
+     <div class="field"><label>最近同步</label><div style="font-size:14px;padding:6px 0;color:${st.lastError?'#b91c1c':'#15803d'}">${syncInfo}</div></div>
+     <div class="row-actions"><button class="btn green" onclick="syncPushNow()">立即同步到云端</button>
+     <button class="btn blue" onclick="syncPullNow()">从云端重新拉取</button></div>
+     <div class="muted-note">同步采用乐观锁：若其它设备已更新云端数据，系统会提示并自动拉取最新版本，避免互相覆盖。</div></div>
+   <div class="panel"><h3>存储边界</h3>
+     <div class="muted-note" style="border-top:0;padding-top:0">• 账号、注册时间、试用到期、付费 / 续费状态、权限状态与使用期限：腾讯云 CloudBase 云函数 <b>ent</b> 持久化，服务端校验。<br>
+     • 备课、作业、教研、班级等业务数据：按账号保存在云端 workspace，单账号上限 2 MB。<br>
+     • 附件内容：保存在本机缓存，云端只同步附件清单；换设备需重新上传。<br>
+     • 每次启动与每 5 分钟心跳都会向服务端复核权限；断网或权限到期立即锁定，不缓存授权、不留离线宽限。</div></div>
+  </div>`;}
+async function syncPushNow(){
+  if(!window.ENT_SYNC||!window.ENT_GATE){handleErr('当前未登录或授权服务不可用，无法同步');return;}
+  try{
+    const r=await window.ENT_GATE.api('/api/workspace',{method:'PUT',body:{data:JSON.stringify(DB),version:window.ENT_SYNC.version(),force:true}});
+    if(r.status===200&&r.data&&r.data.ok){alert('已同步到腾讯云（v'+r.data.data.version+'）');viewSync($('content'));}
+    else handleErr('同步失败：'+(r.data&&r.data.message||('HTTP '+r.status)));
+  }catch(e){handleErr('同步失败：'+e.message);}}
+async function syncPullNow(){
+  if(!window.ENT_GATE){handleErr('当前未登录，无法拉取云端数据');return;}
+  try{
+    const r=await window.ENT_GATE.api('/api/workspace');
+    if(r.status!==200||!r.data||!r.data.ok){handleErr('拉取失败：'+(r.data&&r.data.message||('HTTP '+r.status)));return;}
+    const text=r.data.data&&r.data.data.data;
+    if(!text){alert('云端暂无该账号的数据，本机缓存保持不变');return;}
+    const raw=JSON.parse(text);
+    /* D03/D03b：云端恢复同样走统一归一化，校验失败拒绝替换，保护现有数据 */
+    const d=normalizeDB(raw);
+    if(!d){alert('恢复失败：云端数据不是有效的工作台数据（classes 缺失或为空），原数据保持不变');return;}
+    window.__ENT_SUSPEND_SYNC__=true;DB=d;writeStorage(DB);window.__ENT_SUSPEND_SYNC__=false;
+    render();alert('已从云端恢复最新数据');
+  }catch(e){handleErr('拉取失败：'+e.message);}}
+/* 以下加密工具保留为通用能力（不提供任何离线备份入口） */
+function hasCrypto(){return typeof crypto!=='undefined'&&crypto.subtle&&crypto.subtle.encrypt;}
+function b64From(u8){let s='';for(let i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return btoa(s);}
+function unb64To(s){const b=atob(s);const u8=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u8[i]=b.charCodeAt(i);return u8;}
+async function deriveKey(pass,salt){const enc=new TextEncoder();const base=await crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+/* D30：降级路径改为 UTF-8 字节级 XOR，移除废弃 escape/unescape */
+async function encBackup(pwd){if(hasCrypto()){const enc=new TextEncoder();const data=enc.encode(JSON.stringify(DB));
+  const salt=crypto.getRandomValues(new Uint8Array(16));const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pwd,salt);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data);
+  return JSON.stringify({v:1,salt:b64From(salt),iv:b64From(iv),ct:b64From(new Uint8Array(ct))});}
+  /* 降级路径（无 Web Crypto）：对 UTF-8 字节做 XOR，避免已废弃的 escape/unescape
+     以及中文 charCode 溢出一个字节导致的加解密不一致 */
+  const bytes=new TextEncoder().encode(JSON.stringify(DB)),k=new TextEncoder().encode(pwd);
+  if(!k.length)throw new Error('备份口令不能为空');
+  const out=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)out[i]=bytes[i]^k[i%k.length];
+  return JSON.stringify({v:0,ct:b64From(out)});}
+async function decBackup(text,pwd){const o=JSON.parse(text);
+  if(o.v===1){const salt=unb64To(o.salt),iv=unb64To(o.iv),ct=unb64To(o.ct);const key=await deriveKey(pwd,salt);
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);return JSON.parse(new TextDecoder().decode(pt));}
+  const bytes=unb64To(o.ct),k=new TextEncoder().encode(pwd);
+  if(!k.length)throw new Error('备份口令不能为空');
+  const out=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)out[i]=bytes[i]^k[i%k.length];
+  return JSON.parse(new TextDecoder().decode(out));}
+
+/* ============== 模块命名空间（统一出口，为后续拆分 ES Module 预留接缝） ============== */
+/* 结构：App.data 数据与种子 / App.store 持久化与工具 / App.crypto 加密备份 / App.views 视图 / App.ui 交互 */
+const App={
+  version:SCHEMA_VERSION,
+  data:{STAGES,SUBJECTS,KNOWLEDGE,PREP_TPL,SUBJECT_REGISTRY,registerSubject,makeClass,defaultData,profOf,knOf,sampleQuiz},
+  store:{load,save,cur,num,uid,esc},
+  crypto:{encBackup,decBackup,hasCrypto,deriveKey},
+  views:{viewOverview,viewPrep,viewTimetable,viewInteraction,viewHomework,viewAnalytics,viewResearch,viewStudents,viewClassSettings,viewFamily,viewKnowledge,viewResources,viewAI,viewSync,viewHelp,viewGrading},
+  ui:{modal,closeModal,handleErr},
+};
+
+/* 在线版：不注册 Service Worker、不缓存任何业务页面；断网由 sub/gate.js 直接锁定 */
+/* 全局错误兜底：避免单点异常导致整页白屏 */
+window.addEventListener('error',e=>{handleErr('发生异常：'+(e&&e.message||'未知错误'));});
+/* 云端 workspace 读写桥：由 sub/gate.js 在服务端授权通过后调用 */
+window.__ENT_WORKSPACE__={
+  apply:function(text){try{const raw=JSON.parse(text);const d=normalizeDB(raw);if(!d)return false;
+    window.__ENT_SUSPEND_SYNC__=true;DB=d;writeStorage(DB);window.__ENT_SUSPEND_SYNC__=false;return true;}catch(e){return false;}},
+  snapshot:function(){try{return JSON.stringify(DB);}catch(e){return '';}}
+};
+/* 启动钩子：只有服务端明确放行（__ENT_ALLOWED__===true）才启动业务脚本 */
+window.__ENT_BOOT__=()=>{if(window.__ENT_BOOTED__)return;window.__ENT_BOOTED__=true;buildMenu();render();};
+if(window.__ENT_ALLOWED__===true)window.__ENT_BOOT__();
+</script>
+</body>
+</html>

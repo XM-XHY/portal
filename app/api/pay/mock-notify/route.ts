@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
   if (!orderId) return NextResponse.json({ error: "缺少 orderId" }, { status: 400 });
   const order = await getOrder(orderId);
   if (!order) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
-  await markOrderPaid(orderId, "MOCK" + Date.now());
+  // SEC-05：模拟回调也必须携带与下单一致的实付金额，禁止任意置为已付
+  await markOrderPaid(orderId, "MOCK" + Date.now(), order.amountFen);
   return NextResponse.json({ ok: true, status: "paid" });
 }

@@ -87,7 +87,10 @@ export default function ChatWidget() {
     startX: 0, startY: 0, origX: 0, origY: 0,
   });
 
-  const hidden = pathname?.startsWith("/admin");
+  // 后台页与全屏作品体验页都不显示悬浮客服：后者视口要完整留给 iframe
+  const hidden = Boolean(
+    pathname?.startsWith("/admin") || pathname?.startsWith("/works/")
+  );
   const companyName = "XX 科技";
 
   // 初始化：读取上次拖拽位置（客户端挂载后执行，避免 SSR 不一致）
@@ -95,10 +98,21 @@ export default function ChatWidget() {
     setBallPos(loadPos());
   }, []);
 
-  const defaultBall = (): Pos =>
+  const defaultBall = (): Pos => {
+    if (typeof window === "undefined") return { x: 0, y: 0 };
+    // 窄屏有底部悬浮 CTA（约 60px + 安全区），悬浮球要抬到它上面
+    const bottomGap = window.innerWidth < 768 ? 104 : 24;
+    return {
+      x: window.innerWidth - BALL_SIZE - (window.innerWidth < 768 ? 16 : 24),
+      y: window.innerHeight - BALL_SIZE - bottomGap,
+    };
+  };
+
+  /** 拖拽后窗口宽度不能超过视口，否则 375px 屏上会横向溢出 */
+  const panelWidth = () =>
     typeof window === "undefined"
-      ? { x: 0, y: 0 }
-      : { x: window.innerWidth - BALL_SIZE - 24, y: window.innerHeight - BALL_SIZE - 24 };
+      ? PANEL_W
+      : Math.min(PANEL_W, window.innerWidth - 24);
 
   /** 指针按下：记录起点，捕获指针 */
   const onBallPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -230,8 +244,9 @@ export default function ChatWidget() {
 
   // 悬浮球与窗口的固定定位（仅在拖拽过后启用；SSR 阶段不计算）
   const pos = ballPos ?? defaultBall();
-  const panelH = Math.min((typeof window === "undefined" ? 800 : window.innerHeight) * 0.7, 560);
-  const panelLeft = clampPos(pos.x + BALL_SIZE / 2 - PANEL_W / 2, 0, PANEL_W, 0).x;
+  const panelH = Math.min((typeof window === "undefined" ? 800 : window.innerHeight) * 0.65, 520);
+  const pw = panelWidth();
+  const panelLeft = clampPos(pos.x + BALL_SIZE / 2 - pw / 2, 0, pw, 0).x;
   const above = pos.y - panelH - 12;
   const panelTop = above >= 8 ? above : clampPos(0, pos.y + BALL_SIZE + 12, 0, panelH).y;
   const useFixed = ballPos !== null; // 拖拽过后窗口跟随球；否则走原 CSS 默认位
@@ -245,8 +260,8 @@ export default function ChatWidget() {
         onPointerUp={onBallPointerUp}
         onPointerCancel={onBallPointerUp}
         aria-label="打开智能客服"
-        style={useFixed ? { left: pos.x, top: pos.y } : undefined}
-        className={`fixed bottom-20 right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-brand-blue to-brand-violet text-2xl shadow-lg shadow-brand-blue/30 transition hover:scale-105 md:bottom-6 md:right-6 ${dragging ? "cursor-grabbing scale-105" : "cursor-grab"} touch-none select-none`}
+        style={useFixed ? { left: pos.x, top: pos.y, bottom: "auto" } : undefined}
+        className={`chat-ball fixed right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-brand-blue to-brand-violet text-2xl shadow-lg shadow-brand-blue/30 transition hover:scale-105 md:right-6 ${dragging ? "cursor-grabbing scale-105" : "cursor-grab"} touch-none select-none`}
       >
         {open ? "✕" : "💬"}
         {!open && nudge && (
@@ -257,8 +272,8 @@ export default function ChatWidget() {
       {/* 轻提示气泡 */}
       {!open && nudge && (
         <div
-          style={useFixed ? { left: Math.max(8, pos.x - 160), top: Math.max(8, pos.y - 64) } : undefined}
-          className="fixed bottom-[8.5rem] right-4 z-50 max-w-[220px] rounded-2xl rounded-br-sm border border-white/10 bg-slate-900/95 p-3 text-xs leading-relaxed text-slate-300 shadow-xl md:bottom-24 md:right-6"
+          style={useFixed ? { left: Math.max(8, pos.x - 160), top: Math.max(8, pos.y - 64), bottom: "auto" } : undefined}
+          className="chat-nudge fixed right-4 z-50 max-w-[220px] rounded-2xl rounded-br-sm border border-white/10 bg-slate-900/95 p-3 text-xs leading-relaxed text-slate-300 shadow-xl md:right-6"
         >
           有 AI 方面的问题？点我可以直接聊，也可以按住拖到我方便的位置 🙂
           <button onClick={() => setNudge(false)} className="mt-1 block text-slate-500 hover:text-slate-300">知道了</button>
@@ -268,8 +283,8 @@ export default function ChatWidget() {
       {/* 聊天窗口（跟随悬浮球位置） */}
       {open && (
         <div
-          style={useFixed ? { left: panelLeft, top: panelTop, width: PANEL_W } : undefined}
-          className="fixed inset-x-3 bottom-36 z-50 flex h-[70vh] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur md:inset-x-auto md:bottom-24 md:right-6 md:w-[380px]"
+          style={useFixed ? { left: panelLeft, top: panelTop, width: pw, bottom: "auto" } : undefined}
+          className="chat-panel fixed inset-x-3 z-50 flex h-[min(65dvh,520px)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur md:inset-x-auto md:right-6 md:h-[70vh] md:max-h-[560px] md:w-[380px]"
         >
           {/* 头部 */}
           <div className="flex items-center gap-3 border-b border-white/10 bg-white/5 px-4 py-3">
@@ -322,7 +337,7 @@ export default function ChatWidget() {
                   <button
                     key={q}
                     onClick={() => send(q)}
-                    className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-300 transition hover:border-brand-cyan/50 hover:text-brand-cyan"
+                    className="min-h-[36px] rounded-full border border-white/15 px-3 py-2 text-xs text-slate-300 transition hover:border-brand-cyan/50 hover:text-brand-cyan"
                   >
                     {q}
                   </button>
@@ -342,7 +357,8 @@ export default function ChatWidget() {
               onChange={(e) => setInput(e.target.value)}
               maxLength={500}
               placeholder="输入你的问题…"
-              className="flex-1 rounded-xl border border-white/10 bg-slate-900/80 px-3.5 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-brand-cyan/60"
+              aria-label="输入你的问题"
+              className="min-h-[44px] flex-1 rounded-xl border border-white/10 bg-slate-900/80 px-3.5 py-2.5 text-base text-white placeholder:text-slate-500 outline-none focus:border-brand-cyan/60 sm:text-sm"
             />
             <button
               type="submit"

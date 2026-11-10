@@ -104,11 +104,14 @@ export default function ExploreClient() {
   const isWatched = (url: string) => watchlist.some((x) => x.url === url);
 
   function openLead(title = "") {
+    // 检索降级为示例数据时禁止留资：这些条目是假数据，不能作为真实商机入库
+    if (data?.provider === "mock") return;
     setLeadTitle(title);
     setShowLead(true);
   }
 
   const watchedCount = watchlist.length;
+  const isMock = data?.provider === "mock";
   const queryEcho = useMemo(() => (data ? data.query : ""), [data]);
 
   return (
@@ -332,9 +335,15 @@ export default function ExploreClient() {
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
                 留下联系方式，我们按此方向持续为你跟进最新政策、供应商与商机情报。
               </p>
-              <button onClick={() => openLead("")} className="btn-primary mt-4">
-                免费获取定制情报
-              </button>
+              {isMock ? (
+                <p className="mx-auto mt-4 max-w-md rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
+                  ⚠️ 当前展示的是演示示例数据，暂不可提交留资。请稍后重试，待真实检索恢复后再订阅。
+                </p>
+              ) : (
+                <button onClick={() => openLead("")} className="btn-primary mt-4">
+                  免费获取定制情报
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -351,6 +360,7 @@ export default function ExploreClient() {
           query={queryEcho || q}
           focusTitle={leadTitle}
           watchlist={leadTitle ? [] : watchlist}
+          demo={isMock}
           onClose={() => setShowLead(false)}
         />
       )}
@@ -377,11 +387,13 @@ function LeadModal({
   query,
   focusTitle,
   watchlist,
+  demo,
   onClose,
 }: {
   query: string;
   focusTitle: string;
   watchlist: WatchItem[];
+  demo?: boolean;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<Lead>({ name: "", phone: "", company: "", query });
@@ -405,7 +417,7 @@ function LeadModal({
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, query: contextQuery }),
+        body: JSON.stringify({ ...form, query: contextQuery, ...(demo ? { demo: true } : {}) }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || "提交失败");
@@ -491,6 +503,9 @@ function WatchlistModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-white">⭐ 我的关注清单</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          关注清单与搜索历史仅保存在本机浏览器，换设备或清除缓存后不会同步；提交给顾问后才会写入服务端线索库。
+        </p>
         {items.length === 0 ? (
           <p className="mt-4 text-sm text-slate-400">
             还没有关注任何信息。检索后在结果条目上点「☆ 关注此信息」，即可在此汇总并交给顾问深挖。

@@ -146,9 +146,8 @@ export default function SchedulePublic() {
 
   async function exportExcel() {
     if (!state.result) return;
-    const wb = (await buildScheduleWorkbook(state)) as any;
-    const XLSX = await import("xlsx");
-    const buf = XLSX.write(wb, { type: "array" }) as ArrayBuffer;
+    // lib/schedule-engine 直接返回 xlsx 二进制（底层已由 xlsx 换成 exceljs），前端只负责下载
+    const buf = await buildScheduleWorkbook(state);
     downloadBlob(
       new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
       `课表_${new Date().toISOString().slice(0, 10)}.xlsx`
@@ -327,6 +326,12 @@ export default function SchedulePublic() {
         {err && <p className="text-sm text-red-400">{err}</p>}
         <p className="text-xs text-slate-500">
           提示：本页排课在浏览器本地完成，不会自动上传。导出 Excel / 打印 PDF 会弹出收款二维码，支付后即可下载。
+        </p>
+        <p className="text-xs text-slate-500">
+          还需要分班？
+          <a href="/balance" className="ml-1 text-brand-cyan hover:underline">
+            前往均衡分班系统 →
+          </a>
         </p>
       </div>
 

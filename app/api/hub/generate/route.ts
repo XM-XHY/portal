@@ -4,18 +4,11 @@ import { getAdminFromCookie, clientIp } from "@/lib/session";
 import { searchKnowledge } from "@/lib/kb";
 import { buildMaterialPrompt, fallbackMaterial } from "@/lib/hub";
 import { llmChat } from "@/lib/llm";
+import { rateLimit } from "@/lib/rate-limit";
+import { saveHubMaterial } from "@/lib/hub-materials";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-/** 简单限流：同一 IP 4 秒至多 1 次 */
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const last = (globalThis as any).__lastHubGen?.[ip] || 0;
-  if (now - last < 4000) return true;
-  (globalThis as any).__lastHubGen = { ...((globalThis as any).__lastHubGen || {}), [ip]: now };
-  return false;
-}
 
 /** 从材料正文里取标题：优先第一个 # 标题，否则取需求前 40 字 */
 function titleOf(content: string, question: string): string {
@@ -33,8 +26,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const ip = clientIp(req);
-  if (rateLimited(ip)) {
-    return NextResponse.json({ error: "操作太频繁，请稍等几秒再试" }, { status: 429 });
+  const rl = await rateLimit(`hubgen:${ip}`, 1, 4000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `操作太频繁，请 ${rl.retryAfter} 秒后再试` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
   }
 
   const b = await req.json().catch(() => ({}));
@@ -59,6 +56,9 @@ export async function POST(req: NextRequest) {
   const content =
     llm ?? fallbackMaterial(question, hits, site.companyName).content;
 
+  const engine = llm ? "llm" : hits.length ? "kb" : "template";
+  const title = titleOf(content, question);
+
   await appendAudit({
     actor: user.username,
     action: "hub.generate",
@@ -67,12 +67,29 @@ export async function POST(req: NextRequest) {
     detail: question.slice(0, 60),
   });
 
+  // 生成结果落库，供「我的材料」历史查看；写库失败不影响本次生成结果
+  let materialId: string | undefined;
+  try {
+    const saved = await saveHubMaterial({
+      title,
+      content,
+      question,
+      sources: sources.length ? sources : undefined,
+      engine,
+      owner: user.username,
+    });
+    materialId = saved.id;
+  } catch (e) {
+    console.error("[hub] 材料落库失败:", (e as Error)?.message);
+  }
+
   return NextResponse.json(
     {
-      title: titleOf(content, question),
+      title,
       content,
-      engine: llm ? "llm" : hits.length ? "kb" : "template",
+      engine,
       sources: sources.length ? sources : undefined,
+      materialId,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getContents, saveContents, newId, appendAudit, type ContentItem, type ContentType } from "@/lib/store";
+import {
+  getContents,
+  saveContents,
+  deleteContents,
+  newId,
+  appendAudit,
+  type ContentItem,
+  type ContentType,
+} from "@/lib/store";
+import { SYSTEM_CONTENT_TYPES } from "@/lib/data/types";
 import { getAdminFromCookie, clientIp } from "@/lib/session";
 import { can } from "@/lib/auth";
 
@@ -13,6 +22,25 @@ function parseTags(v: unknown): string[] {
 
 /** 内容管理里可维护的前台展示类型（知识库 kb / 产品资料 pdoc 有各自专用接口） */
 const EDITABLE_TYPES = new Set<ContentType>(["news", "product", "solution", "case"]);
+/** 批量导入允许的类型（含系统内部类型，用于数据恢复/迁移） */
+const ALL_TYPES = new Set<ContentType>([
+  "news",
+  "product",
+  "solution",
+  "case",
+  "kb",
+  "pdoc",
+  "sched",
+  "sched_share",
+  "paycfg",
+  "order",
+  "balance_pub",
+  "mp_bind",
+  "hub_material",
+  // rate（限流计数桶）属于高频写入的系统内部数据，不允许通过后台导入
+]);
+
+const SYSTEM_SET = new Set<ContentType>(SYSTEM_CONTENT_TYPES);
 
 function normalizeType(v: unknown, fallback: ContentType = "news"): ContentType {
   return EDITABLE_TYPES.has(v as ContentType) ? (v as ContentType) : fallback;
@@ -37,17 +65,54 @@ function maxOrderOf(list: ContentItem[], type: ContentType): number {
 export async function GET(req: NextRequest) {
   const type = (req.nextUrl.searchParams.get("type") as ContentType) || undefined;
   const all = await getContents(type);
-  // 知识库文档（kb）与产品资料（pdoc）有各自的专用管理入口，不在这里重复出现
-  return NextResponse.json(all.filter((c) => c.type !== "kb" && c.type !== "pdoc"));
+  // 知识库文档（kb）/产品资料（pdoc）有专用管理入口；系统内部类型（订单、限流桶等）不出现在 CMS 列表
+  return NextResponse.json(
+    all.filter((c) => c.type !== "kb" && c.type !== "pdoc" && !SYSTEM_SET.has(c.type))
+  );
 }
 
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "content.manage")) {
+  if (!can(admin, "content.manage")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
-  const b = await req.json().catch(() => ({}));
+  const raw = await req.json().catch(() => ({}));
+
+  // 批量导入 / 恢复：传入数组时按原 id 整体写入（用于数据恢复与迁移）
+  if (Array.isArray(raw)) {
+    const items: ContentItem[] = [];
+    for (const it of raw) {
+      if (!it || !it.id || !it.type) continue;
+      items.push({
+        id: String(it.id).slice(0, 60),
+        type: ALL_TYPES.has(it.type as ContentType) ? (it.type as ContentType) : "news",
+        title: String(it.title || "").slice(0, 120),
+        tag: String(it.tag || "通用").slice(0, 20),
+        summary: String(it.summary || "").slice(0, 300),
+        body: String(it.body || ""),
+        icon: String(it.icon || "📄").slice(0, 8),
+        tags: Array.isArray(it.tags) ? it.tags.map((t: any) => String(t)).slice(0, 20) : [],
+        client: String(it.client || "").slice(0, 120),
+        industry: String(it.industry || "").slice(0, 120),
+        result: String(it.result || "").slice(0, 120),
+        at: String(it.at || new Date().toISOString().slice(0, 10)),
+        order: Number(it.order) || 0,
+      });
+    }
+    if (!items.length) return NextResponse.json({ error: "没有可导入的条目" }, { status: 400 });
+    await saveContents(items);
+    await appendAudit({
+      actor: admin.username,
+      action: "content.import",
+      target: `content:*`,
+      ip: clientIp(req),
+      detail: `批量导入 ${items.length} 条`,
+    });
+    return NextResponse.json({ ok: true, count: items.length });
+  }
+
+  const b = raw;
   const type = normalizeType(b.type);
   const list0 = await getContents();
   const item: ContentItem = {
@@ -82,7 +147,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "content.manage")) {
+  if (!can(admin, "content.manage")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
   const b = await req.json().catch(() => ({}));
@@ -119,7 +184,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "content.manage")) {
+  if (!can(admin, "content.manage")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
   const id = req.nextUrl.searchParams.get("id");
@@ -133,7 +198,7 @@ export async function DELETE(req: NextRequest) {
     );
   }
   const list = all.filter((n) => n.id !== id);
-  await saveContents(list);
+  await deleteContents([id]);
   await appendAudit({
     actor: admin.username,
     action: "content.delete",

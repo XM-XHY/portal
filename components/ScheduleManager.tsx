@@ -97,6 +97,8 @@ export default function ScheduleManager() {
   const [edit, setEdit] = useState<{ classId: string; d: number; p: number } | null>(null);
   const [drag, setDrag] = useState<{ d: number; p: number } | null>(null);
   const [shareUrl, setShareUrl] = useState("");
+  const [expiresDays, setExpiresDays] = useState(30);
+  const [shareTick, setShareTick] = useState(0);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
@@ -202,11 +204,12 @@ export default function ScheduleManager() {
   async function createShare() {
     setBusy(true);
     try {
-      const res = await fetch("/api/schedule/share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "课表分享" }) });
+      const res = await fetch("/api/schedule/share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "课表分享", expiresDays }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "分享失败");
       setShareUrl(d.url);
-      flash("已生成只读分享链接");
+      setShareTick((t) => t + 1);
+      flash(`已生成只读分享链接（${d.expiresDays || expiresDays} 天有效）`);
     } catch (e: any) {
       setErr(e.message || "分享失败");
     } finally { setBusy(false); }
@@ -335,6 +338,10 @@ export default function ScheduleManager() {
               <span className="ml-auto flex gap-2">
                 <a href="/api/schedule/export" className="btn-ghost py-2 text-sm">⬇ Excel</a>
                 <button onClick={() => window.print()} className="btn-ghost py-2 text-sm">🖨️ PDF/打印</button>
+                <select value={expiresDays} onChange={(e) => setExpiresDays(Number(e.target.value))}
+                  className="rounded-lg border border-white/15 bg-transparent px-2 py-1 text-xs text-slate-300" title="分享链接有效期">
+                  {[7, 30, 90, 365].map((d) => <option key={d} value={d}>{d} 天有效</option>)}
+                </select>
                 <button onClick={createShare} disabled={busy} className="btn-ghost py-2 text-sm">🔗 分享链接</button>
               </span>
             </div>
@@ -346,6 +353,8 @@ export default function ScheduleManager() {
                 <button onClick={() => navigator.clipboard?.writeText(shareUrl)} className="ml-2 text-xs text-slate-400 hover:text-white">复制</button>
               </div>
             )}
+
+            <ShareLinksPanel tick={shareTick} />
 
             <ScheduleGrid
               state={state}
@@ -581,6 +590,80 @@ function CellEditor(props: {
           <button onClick={props.onClose} className="btn-ghost ml-auto">取消</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- 分享链接管理（有效期 / 吊销） ---------------- */
+type ShareRow = {
+  token: string;
+  title: string;
+  createdAt: string;
+  expiresAt?: string;
+  expired: boolean;
+  revoked: boolean;
+  owner?: string;
+};
+
+function ShareLinksPanel({ tick }: { tick: number }) {
+  const [items, setItems] = useState<ShareRow[]>([]);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/schedule/share", { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "加载分享记录失败");
+      setItems(Array.isArray(d.items) ? d.items : []);
+      setErr("");
+    } catch (e: any) {
+      setErr(e.message || "加载分享记录失败");
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load, tick]);
+
+  async function toggle(row: ShareRow) {
+    const action = row.revoked ? "恢复" : "吊销";
+    if (!confirm(`确定${action}这条分享链接？${row.revoked ? "" : "吊销后家长端将无法再打开。"}`)) return;
+    const r = await fetch(`/api/schedule/share?token=${encodeURIComponent(row.token)}${row.revoked ? "&restore=1" : ""}`, { method: "DELETE" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { setErr(d.error || `${action}失败`); return; }
+    await load();
+  }
+
+  if (!items.length) return null;
+
+  return (
+    <div className="mt-5 rounded-2xl border border-white/10 p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-200">🔗 历史分享链接（{items.length}）</h3>
+        <button onClick={load} className="text-xs text-slate-400 hover:text-white">刷新</button>
+      </div>
+      {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
+      <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto text-xs">
+        {items.map((row) => {
+          const dead = row.revoked || row.expired;
+          return (
+            <li key={row.token} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-2">
+              <a href={`/schedule/share/${row.token}`} target="_blank" rel="noreferrer"
+                className={`max-w-[15rem] truncate ${dead ? "text-slate-500 line-through" : "text-brand-cyan hover:underline"}`}>
+                {row.title} · {row.token}
+              </a>
+              <span className="text-slate-500">
+                {new Date(row.createdAt).toLocaleDateString("zh-CN")} 创建
+                {row.expiresAt ? ` · ${new Date(row.expiresAt).toLocaleDateString("zh-CN")} 到期` : " · 永久"}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 ${row.revoked ? "bg-rose-500/20 text-rose-300" : row.expired ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                {row.revoked ? "已吊销" : row.expired ? "已过期" : "生效中"}
+              </span>
+              <button onClick={() => toggle(row)} className="ml-auto text-slate-400 hover:text-white">
+                {row.revoked ? "恢复" : "吊销"}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

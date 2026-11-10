@@ -10,6 +10,9 @@ export async function GET(
 ) {
   const state = await getShareSnapshot(params.token);
   if (!state)
-    return NextResponse.json({ error: "分享链接不存在或已失效" }, { status: 404 });
+    return NextResponse.json(
+      { error: "分享链接不存在、已过期或已被管理员吊销" },
+      { status: 404 }
+    );
   return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
 }

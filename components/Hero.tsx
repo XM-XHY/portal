@@ -10,7 +10,10 @@ export default function Hero({ site }: { site: SiteInfo }) {
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return;
+    // 窄屏直接不跑粒子动画：O(n²) 连线 + 常驻 rAF 会让手机滚动掉帧、发热耗电。
+    // 静态渐变背景仍然保留，视觉上不空。
+    const smallScreen = window.matchMedia("(max-width: 767px)").matches;
+    if (reduce || smallScreen) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -107,17 +110,17 @@ export default function Hero({ site }: { site: SiteInfo }) {
     <section className="relative overflow-hidden">
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full opacity-60"
+        className="absolute inset-0 hidden h-full w-full opacity-60 md:block"
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[#06080f]/40 to-[#06080f]" />
-      <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
+      <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-24 md:py-32">
         <div className="mx-auto max-w-3xl text-center">
           <span className="glass inline-flex items-center gap-2 px-4 py-1.5 text-sm text-brand-cyan">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-cyan" />
             新一代 AI 企业门户已上线
           </span>
-          <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+          <h1 className="mt-5 text-[1.75rem] font-bold leading-tight tracking-tight sm:mt-6 sm:text-4xl md:text-6xl">
             用 <span className="text-gradient">人工智能</span>
             <br />
             重塑企业增长引擎

@@ -22,31 +22,33 @@ export default function SearchWidget() {
           e.preventDefault();
           submit(q);
         }}
-        className="glass flex items-center gap-2 p-2"
+        className="glass flex flex-col gap-2 p-2 sm:flex-row sm:items-center"
       >
-        <span className="pl-3 text-brand-cyan" aria-hidden>
-          🔍
-        </span>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          type="search"
-          inputMode="search"
-          placeholder="输入关键词，全网智能检索（如：AI 获客方案）"
-          aria-label="全网智能搜索关键词"
-          className="flex-1 bg-transparent px-2 py-3 text-base text-slate-100 placeholder:text-slate-500 outline-none"
-        />
-        <button type="submit" className="btn-primary shrink-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="pl-3 text-brand-cyan" aria-hidden>
+            🔍
+          </span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            type="search"
+            inputMode="search"
+            placeholder="输入关键词，全网智能检索"
+            aria-label="全网智能搜索关键词"
+            className="min-w-0 flex-1 bg-transparent px-2 py-3 text-base text-slate-100 placeholder:text-slate-500 outline-none"
+          />
+        </div>
+        <button type="submit" className="btn-primary w-full shrink-0 sm:w-auto">
           智能搜索
         </button>
       </form>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-400 sm:gap-2 sm:text-sm">
         <span>热门：</span>
         {hotKeywords.map((k) => (
           <button
             key={k}
             onClick={() => submit(k)}
-            className="rounded-full border border-white/10 px-3 py-1 transition hover:border-brand-cyan/50 hover:text-white"
+            className="min-h-[36px] rounded-full border border-white/10 px-3 py-1.5 transition hover:border-brand-cyan/50 hover:text-white"
           >
             {k}
           </button>

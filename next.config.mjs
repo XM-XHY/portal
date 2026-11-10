@@ -19,9 +19,10 @@ const nextConfig = {
     // 演示项目跳过 ESLint 阻塞；生产请保留并修复告警
     ignoreDuringBuilds: true,
   },
-  // 文档解析库含动态 require/worker，让 Node 原生加载而非打包
+  // 文档/表格解析库含动态 require，让 Node 原生加载而非打包。
+  // 注意：xlsx@0.18.5 存在 high 级漏洞且无官方修复版，已替换为 exceljs（见 lib/sheet.ts）。
   experimental: {
-    serverComponentsExternalPackages: ["pdf-parse", "mammoth", "xlsx"],
+    serverComponentsExternalPackages: ["pdf-parse", "mammoth", "exceljs"],
   },
   compress: true,
   poweredByHeader: false,

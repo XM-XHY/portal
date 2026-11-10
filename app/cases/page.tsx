@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getContents } from "@/lib/store";
+import { pageMeta } from "@/lib/seo";
 import CasesExplorer from "@/components/CasesExplorer";
 import LeadForm from "@/components/LeadForm";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "客户案例",
-  description: "XX 科技已服务金融、制造、零售等多个行业的领先企业，用 AI 带来可量化的业务增长。",
-};
+  description:
+    "金融、制造、零售等行业领先企业的 AI 落地案例：智能客服升级、企业知识中枢建设、智能获客中台部署，均有可量化的业务成效。",
+  path: "/cases",
+  keywords: ["AI 案例", "智能客服案例", "知识管理案例"],
+});
 
 export default async function CasesPage() {
   const cases = await getContents("case");

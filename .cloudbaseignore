@@ -11,6 +11,14 @@ node_modules
 **/.next/
 .git/
 .gitignore
+# 测试资产与覆盖率报告不参与云端构建，上传只会拖慢部署
+tests/
+coverage/
+coverage
+vitest.config.ts
+lighthouserc.json
+.semgrep-local.yml
+*.tsbuildinfo
 data/
 *.log
 .vercel
@@ -19,5 +27,8 @@ preview/
 tsconfig.tsbuildinfo
 .env.local
 .env*.local
+# 任何 .env* 文件都不得随源码上传（含临时验证文件），密钥只从云端环境变量注入
+.env*
+.env**
 DEPLOY.md
 DEPLOY-CLOUDBASE.md

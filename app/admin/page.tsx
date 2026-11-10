@@ -5,13 +5,14 @@ import Link from "next/link";
 import {
   ROLE_LABELS,
   PERMISSION_LABELS,
+  ROLE_PERMISSIONS,
   can,
   type Role,
   type Permission,
 } from "@/lib/auth";
 import ScheduleManager from "@/components/ScheduleManager";
 
-type Me = { username: string; role: Role } | null;
+type Me = { username: string; role: Role; perms?: string[]; mustChangePassword?: boolean } | null;
 
 const PERM_ORDER: Permission[] = [
   "content.manage",
@@ -21,6 +22,9 @@ const PERM_ORDER: Permission[] = [
   "audit.view",
   "users.manage",
   "settings.manage",
+  "schedule.manage",
+  "order.manage",
+  "balance.manage",
 ];
 
 export default function AdminPage() {
@@ -34,7 +38,7 @@ export default function AdminPage() {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        setMe({ username: data.username, role: data.role });
+        setMe({ username: data.username, role: data.role, perms: data.perms, mustChangePassword: !!data.mustChangePassword });
       } else {
         setMe(null);
       }
@@ -63,6 +67,7 @@ export default function AdminPage() {
     { key: "products", label: "产品中心", perm: "content.manage" },
     { key: "schedule", label: "排课系统", perm: "schedule.manage" },
     { key: "pay", label: "产品付费", perm: "settings.manage" },
+    { key: "orders", label: "订单管理", perm: "order.manage" },
     { key: "content", label: "内容管理", perm: "content.manage" },
     { key: "kb", label: "知识库", perm: "content.manage" },
     { key: "leads", label: "线索管理", perm: "leads.view" },
@@ -70,7 +75,7 @@ export default function AdminPage() {
     { key: "audit", label: "操作审计", perm: "audit.view" },
     { key: "users", label: "用户与角色", perm: "users.manage" },
   ];
-  const managedTabs = allTabs.filter((t) => can(me.role, t.perm));
+  const managedTabs = allTabs.filter((t) => can(me, t.perm));
 
   const tabs = [...managedTabs, { key: "security", label: "账号安全", perm: "settings.manage" as Permission }];
   const active = tab || tabs[0]?.key;
@@ -81,6 +86,24 @@ export default function AdminPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <span className="font-semibold">管理后台</span>
           <div className="flex items-center gap-3 text-sm">
+            {can(me, "search.logs") && (
+              <Link
+                href="/dashboard"
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-400 hover:text-white"
+              >
+                数据看板 ↗
+              </Link>
+            )}
+            {can(me, "users.manage") && (
+              <Link
+                href="/admin/teacher-sub"
+                className="text-slate-400 hover:text-white"
+              >
+                教师工作台订阅
+              </Link>
+            )}
             <span className="rounded-full bg-brand-violet/20 px-3 py-1 text-brand-violet">
               {ROLE_LABELS[me.role]}
             </span>
@@ -99,6 +122,14 @@ export default function AdminPage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        {me.mustChangePassword && (
+          <button
+            onClick={() => setTab("security")}
+            className="mb-5 w-full rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-left text-sm text-amber-200 hover:bg-amber-500/20"
+          >
+            ⚠️ 当前账号仍在使用初始口令，存在被猜测风险。点此前往「账号安全」立即修改 →
+          </button>
+        )}
         <div className="flex flex-wrap gap-2">
           {tabs.map((t) => (
             <button
@@ -120,6 +151,7 @@ export default function AdminPage() {
           {active === "products" && <ProductCenterManager />}
           {active === "schedule" && <ScheduleManager />}
           {active === "pay" && <PayConfigManager />}
+          {active === "orders" && <OrdersManager />}
           {active === "content" && <ContentManager />}
           {active === "kb" && <KbManager />}
           {active === "leads" && <LeadsManager role={me.role} />}
@@ -167,7 +199,7 @@ function Login({ onOk }: { onOk: () => void }) {
     <Center>
       <div className="glass w-full max-w-sm p-8">
         <h1 className="text-2xl font-bold text-center">后台登录</h1>
-        <p className="mt-2 text-center text-sm text-slate-400">XX 科技管理平台</p>
+        <p className="mt-2 text-center text-sm text-slate-400">企业门户管理平台</p>
         <form onSubmit={submit} className="space-y-4">
           <input
             value={username}
@@ -188,13 +220,12 @@ function Login({ onOk }: { onOk: () => void }) {
           </button>
         </form>
         <div className="mt-4 rounded-lg border border-white/10 p-3 text-xs text-slate-400">
-          可用账号：<br />
-          <code>admin</code>（超级管理员，全部权限）<br />
-          <code>market</code>（线索管理员，仅线索与日志）<br />
-          <span className="text-slate-500">口令由管理员设定，不再对外展示。</span>
+          请使用管理员分配的账号登录；连续输错会被临时锁定。
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
-          仅演示用途 · <Link href="/" className="text-brand-cyan hover:underline">返回官网</Link>
+          <Link href="/register" className="text-brand-cyan hover:underline">教师自助注册</Link>
+          {" · "}
+          <Link href="/" className="text-brand-cyan hover:underline">返回官网</Link>
         </p>
       </div>
     </Center>
@@ -1447,25 +1478,137 @@ function EmployeesPanel() {
 }
 
 /* ---------------- 用户与角色 ---------------- */
-function UsersManager() {
-  const [admins, setAdmins] = useState<{ username: string; role: Role }[]>([]);
+type AdminRow = { id: string; username: string; role: Role; mustChangePassword?: boolean; perms?: string[] };
 
-  useEffect(() => {
-    fetch("/api/admins").then((r) => r.ok && r.json()).then((d) => d && setAdmins(d));
+function UsersManager() {
+  const [admins, setAdmins] = useState<AdminRow[]>([]);
+  const [form, setForm] = useState({ username: "", password: "", role: "viewer" as Role });
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/admins", { cache: "no-store" });
+      const d = await r.json();
+      if (r.ok) setAdmins(Array.isArray(d) ? d : []);
+      else setErr(d.error || "加载账号失败");
+    } catch (e: any) {
+      setErr(e.message || "加载账号失败");
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function call(url: string, init: RequestInit, okText: string) {
+    setBusy(true); setMsg(""); setErr("");
+    try {
+      const r = await fetch(url, init);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "操作失败");
+      setMsg(okText);
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "操作失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    await call("/api/admins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    }, "账号已创建");
+    setForm({ username: "", password: "", role: "viewer" });
+  }
+
+  function changeRole(a: AdminRow, role: Role) {
+    if (role === a.role) return;
+    if (!confirm(`确定把「${a.username}」的角色改为「${ROLE_LABELS[role]}」？`)) { load(); return; }
+    void call("/api/admins", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: a.id, role }),
+    }, "角色已更新");
+  }
+
+  function resetPassword(a: AdminRow) {
+    const pw = window.prompt(`为「${a.username}」设置新密码（8-128 位，含字母与数字）：`);
+    if (!pw) return;
+    void call("/api/admins", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: a.id, password: pw }),
+    }, "密码已重置");
+  }
+
+  function remove(a: AdminRow) {
+    if (!confirm(`确定删除账号「${a.username}」？该账号将立即无法登录。`)) return;
+    void call(`/api/admins?id=${encodeURIComponent(a.id)}`, { method: "DELETE" }, "账号已删除");
+  }
 
   return (
     <div className="space-y-6">
       <div className="glass p-6">
         <h3 className="text-lg font-semibold text-white">后台账号</h3>
+        <p className="mt-1 text-xs text-slate-400">
+          可新增账号、调整角色、重置他人密码、删除账号。最后一个超级管理员不可降级或删除。
+        </p>
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+          教师可自助注册账号（默认仅「分班查询码管理」）：
+          <Link href="/register" className="ml-1 text-brand-cyan hover:underline" target="_blank" rel="noreferrer">
+            /register（公开页面）
+          </Link>
+        </div>
+
+        <form onSubmit={create} className="mt-4 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-slate-400">账号
+            <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })}
+              placeholder="2-40 位字母数字" className="input-base mt-1 w-44" required />
+          </label>
+          <label className="text-xs text-slate-400">初始密码
+            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="至少 8 位，含字母数字" className="input-base mt-1 w-48" required minLength={8} />
+          </label>
+          <label className="text-xs text-slate-400">角色
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
+              className="input-base mt-1 w-36">
+              {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" disabled={busy} className="btn-primary disabled:opacity-50">新增账号</button>
+        </form>
+
+        {msg && <p className="mt-3 text-sm text-emerald-400">{msg}</p>}
+        {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
+
         <ul className="mt-4 space-y-2">
-          {admins
-            .filter((a) => a.role !== "employee")
-            .map((a) => (
-            <li key={a.username} className="flex items-center gap-3 rounded-lg border border-white/10 p-3">
-              <span className="text-white">{a.username}</span>
-              <span className="rounded-full bg-brand-violet/20 px-3 py-1 text-xs text-brand-violet">
-                {ROLE_LABELS[a.role]}
+          {admins.filter((a) => a.role !== "employee").map((a) => (
+            <li key={a.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3">
+              <span className="min-w-24 text-white">{a.username}</span>
+              {a.mustChangePassword && (
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">仍在使用初始口令</span>
+              )}
+              <select value={a.role} disabled={busy} onChange={(e) => changeRole(a, e.target.value as Role)}
+                className="input-base w-36 py-1 text-xs">
+                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+              <span className="ml-auto flex gap-2">
+                <button onClick={() => resetPassword(a)} disabled={busy}
+                  className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 disabled:opacity-50">
+                  重置密码
+                </button>
+                <button onClick={() => remove(a)} disabled={busy}
+                  className="rounded-lg border border-rose-400/40 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-50">
+                  删除
+                </button>
               </span>
             </li>
           ))}
@@ -1473,6 +1616,8 @@ function UsersManager() {
       </div>
 
       <EmployeesPanel />
+
+      <PermManager admins={admins} reload={load} />
 
       <div className="glass p-6">
         <h3 className="text-lg font-semibold text-white">RBAC 权限矩阵</h3>
@@ -1505,8 +1650,153 @@ function UsersManager() {
           </table>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          账号与权限的增删改请在服务端数据存储（data/db.json）或接入身份服务后扩展。
+          角色权限由 lib/auth.ts 定义；账号数据保存在服务端存储，换设备登录不受影响。
         </p>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== 逐账号权限分配 ==================== */
+
+function PermManager({ admins, reload }: { admins: AdminRow[]; reload: () => void }) {
+  const [edits, setEdits] = useState<Record<string, string[]>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  function effective(a: AdminRow): string[] {
+    const base = a.perms ?? ROLE_PERMISSIONS[a.role];
+    const ov = edits[a.id];
+    return ov ? ov : base;
+  }
+
+  function toggle(a: AdminRow, p: Permission) {
+    const cur = effective(a);
+    const next = cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p];
+    setEdits((e) => ({ ...e, [a.id]: next }));
+  }
+
+  async function save(a: AdminRow) {
+    setBusyId(a.id);
+    setMsg("");
+    setErr("");
+    const chosen = edits[a.id] ?? a.perms ?? ROLE_PERMISSIONS[a.role];
+    const roleDefault = ROLE_PERMISSIONS[a.role];
+    const sameAsDefault =
+      chosen.length === roleDefault.length && roleDefault.every((p) => chosen.includes(p));
+    const body = sameAsDefault ? { id: a.id, perms: null } : { id: a.id, perms: chosen };
+    try {
+      const r = await fetch("/api/admins", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "保存失败");
+      setMsg(`已保存「${a.username}」的权限`);
+      setEdits((e) => {
+        const n = { ...e };
+        delete n[a.id];
+        return n;
+      });
+      await reload();
+    } catch (e: any) {
+      setErr(e.message || "保存失败");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function restore(a: AdminRow) {
+    setBusyId(a.id);
+    setMsg("");
+    setErr("");
+    try {
+      const r = await fetch("/api/admins", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: a.id, perms: null }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "恢复失败");
+      setMsg(`已恢复「${a.username}」为角色默认权限`);
+      setEdits((e) => {
+        const n = { ...e };
+        delete n[a.id];
+        return n;
+      });
+      await reload();
+    } catch (e: any) {
+      setErr(e.message || "恢复失败");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="glass p-6">
+      <h3 className="text-lg font-semibold text-white">逐账号权限分配</h3>
+      <p className="mt-1 text-xs text-slate-400">
+        在角色默认权限之外，可逐账号勾选覆盖。保存后该账号以勾选项为准；「恢复默认」清除覆盖、回退角色权限。
+      </p>
+      {msg && <p className="mt-3 text-sm text-emerald-400">{msg}</p>}
+      {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
+      <div className="mt-4 space-y-4">
+        {admins.map((a) => {
+          const eff = effective(a);
+          const changed = edits[a.id] !== undefined;
+          return (
+            <div key={a.id} className="rounded-lg border border-white/10 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="min-w-24 text-white">{a.username}</span>
+                <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-300">
+                  {ROLE_LABELS[a.role]}
+                </span>
+                {a.perms && !changed && (
+                  <span className="rounded-full bg-brand-violet/20 px-2 py-0.5 text-xs text-brand-violet">
+                    已自定义
+                  </span>
+                )}
+                {changed && (
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+                    未保存
+                  </span>
+                )}
+                <span className="ml-auto flex gap-2">
+                  <button
+                    onClick={() => save(a)}
+                    disabled={busyId === a.id}
+                    className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => restore(a)}
+                    disabled={busyId === a.id}
+                    className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-slate-400 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    恢复默认
+                  </button>
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+                {PERM_ORDER.map((p) => (
+                  <label key={p} className="flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={eff.includes(p)}
+                      onChange={() => toggle(a, p)}
+                      className="h-4 w-4 rounded border-white/20 bg-white/5 accent-brand-violet"
+                    />
+                    {PERMISSION_LABELS[p]}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {admins.length === 0 && <p className="text-sm text-slate-500">暂无可分配的账号。</p>}
       </div>
     </div>
   );
@@ -1646,6 +1936,329 @@ function KbManager() {
 
 /* ==================== 产品付费（收款二维码 + 各产品下载付费金额） ==================== */
 
+/* ---------------- 订单管理（查单 / 退款 / 导出 CSV） ---------------- */
+type OrderRow = {
+  id: string;
+  productId: string;
+  productTitle: string;
+  amount: number;
+  provider: string;
+  status: string;
+  codeUrl?: string;
+  tradeNo?: string;
+  createdAt: string;
+  paidAt?: string;
+  expiresAt?: string;
+  client?: string;
+  refunds?: { refundNo: string; status: string; amount: number; reason?: string; at: string; gatewayRefundId?: string }[];
+  refundedAmount?: number;
+};
+
+const ORDER_STATUS_LABEL: Record<string, { text: string; cls: string }> = {
+  pending: { text: "待支付", cls: "bg-amber-500/20 text-amber-300" },
+  paid: { text: "已支付", cls: "bg-emerald-500/20 text-emerald-300" },
+  expired: { text: "已超时", cls: "bg-slate-500/20 text-slate-400" },
+  refunding: { text: "部分退款", cls: "bg-orange-500/20 text-orange-300" },
+  refunded: { text: "已退款", cls: "bg-rose-500/20 text-rose-300" },
+};
+
+function OrdersManager() {
+  const [rows, setRows] = useState<OrderRow[]>([]);
+  const [stat, setStat] = useState<any>({});
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [refundFor, setRefundFor] = useState<OrderRow | null>(null);
+  const [refundAmount, setRefundAmount] = useState<string>("");
+  const [refundReason, setRefundReason] = useState("");
+
+  const load = useCallback((overrideQ?: string, overrideStatus?: string) => {
+    setLoading(true);
+    setErr("");
+    const qs = new URLSearchParams();
+    const query = overrideQ ?? q;
+    const st = overrideStatus ?? status;
+    if (query) qs.set("q", query);
+    if (st && st !== "all") qs.set("status", st);
+    fetch(`/api/admin/orders?${qs.toString()}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) { setErr(d.error); setRows([]); return; }
+        setRows(d.orders || []);
+        setStat(d.stat || {});
+      })
+      .catch(() => setErr("加载失败"))
+      .finally(() => setLoading(false));
+  }, [q, status]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function syncOne(o: OrderRow) {
+    setBusyId(o.id);
+    setNote("");
+    setErr("");
+    try {
+      const r = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: o.id }),
+      });
+      const d = await r.json();
+      if (d.error) setErr(d.error);
+      else setNote(`${o.id}：${d.note || "已同步"}`);
+      load();
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  /** 同步退款状态：退款回调丢失或状态仍为处理中时，向微信主动查询并回写 */
+  async function syncRefund(o: OrderRow) {
+    setBusyId(o.id);
+    setNote("");
+    setErr("");
+    try {
+      const r = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: o.id, action: "sync-refund" }),
+      });
+      const d = await r.json();
+      if (d.error) setErr(d.error);
+      else setNote(`${o.id}：${d.note || "已同步退款状态"}`);
+      load();
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function doRefund() {
+    if (!refundFor) return;
+    setBusyId(refundFor.id);
+    setErr("");
+    setNote("");
+    try {
+      const r = await fetch("/api/admin/orders/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: refundFor.id,
+          amount: refundAmount === "" ? undefined : Number(refundAmount),
+          reason: refundReason || "管理员后台退款",
+        }),
+      });
+      const d = await r.json();
+      if (d.error) {
+        setErr(d.error);
+      } else {
+        setNote(`退款已受理：¥${d.refund?.amount}（状态 ${d.refund?.status}）`);
+        setRefundFor(null);
+        setRefundAmount("");
+        setRefundReason("");
+        load();
+      }
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  function exportCsv() {
+    const head = ["订单号", "商品", "金额(元)", "状态", "支付通道", "微信流水号", "下单时间", "支付时间", "已退金额", "退款单号"];
+    const lines = rows.map((o) => [
+      o.id,
+      o.productTitle,
+      o.amount,
+      ORDER_STATUS_LABEL[o.status]?.text || o.status,
+      o.provider,
+      o.tradeNo || "",
+      fmt(o.createdAt),
+      o.paidAt ? fmt(o.paidAt) : "",
+      o.refundedAmount || 0,
+      (o.refunds || []).map((r) => `${r.refundNo}(${r.status})`).join(" "),
+    ]);
+    const csv = [head, ...lines]
+      .map((cols) => cols.map((c) => {
+        const s = String(c ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(","))
+      .join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `订单_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const statCards = [
+    { label: "订单总数", value: `${stat.total ?? 0} 笔` },
+    { label: "已支付", value: `${stat.paidCount ?? 0} 笔 / ¥${stat.paidAmount ?? 0}` },
+    { label: "待支付", value: `${stat.pendingCount ?? 0} 笔` },
+    { label: "累计退款", value: `¥${stat.refundedAmount ?? 0}` },
+  ];
+
+  return (
+    <div className="glass p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold text-white">订单管理</h3>
+        <div className="flex gap-2">
+          <button onClick={() => load()} className="btn-ghost py-2 text-sm">刷新</button>
+          <button onClick={exportCsv} disabled={!rows.length} className="btn-ghost py-2 text-sm disabled:opacity-50">
+            导出 CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {statCards.map((c) => (
+          <div key={c.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-slate-400">{c.label}</div>
+            <div className="mt-1 text-lg font-semibold text-white">{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && load()}
+          placeholder="搜索订单号 / 商品 / 流水号"
+          className="input-base max-w-xs flex-1"
+        />
+        <select
+          value={status}
+          onChange={(e) => { const v = e.target.value; setStatus(v); load(undefined, v); }}
+          className="input-base max-w-[9rem]"
+        >
+          <option value="all">全部状态</option>
+          <option value="pending">待支付</option>
+          <option value="paid">已支付</option>
+          <option value="refunding">部分退款</option>
+          <option value="refunded">已退款</option>
+          <option value="expired">已超时</option>
+        </select>
+        <button onClick={() => load()} className="btn-ghost py-3 text-sm">搜索</button>
+      </div>
+
+      {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
+      {note && <p className="mt-3 text-sm text-emerald-400">{note}</p>}
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="text-slate-400">
+            <tr>
+              <th className="p-2">下单时间</th>
+              <th className="p-2">订单号</th>
+              <th className="p-2">商品</th>
+              <th className="p-2">金额</th>
+              <th className="p-2">状态</th>
+              <th className="p-2">流水号</th>
+              <th className="p-2">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((o) => {
+              const remain = Math.round((o.amount - (o.refundedAmount || 0)) * 100) / 100;
+              const canRefund = o.status === "paid" || o.status === "refunding";
+              return (
+                <tr key={o.id} className="border-t border-white/10">
+                  <td className="p-2 text-slate-400 whitespace-nowrap">{fmt(o.createdAt)}</td>
+                  <td className="p-2 font-mono text-xs text-slate-300">{o.id}</td>
+                  <td className="p-2 text-white">{o.productTitle}</td>
+                  <td className="p-2">¥{o.amount}{o.refundedAmount ? <span className="ml-1 text-xs text-rose-300">已退¥{o.refundedAmount}</span> : null}</td>
+                  <td className="p-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${ORDER_STATUS_LABEL[o.status]?.cls || "bg-slate-500/20 text-slate-300"}`}>
+                      {ORDER_STATUS_LABEL[o.status]?.text || o.status}
+                    </span>
+                  </td>
+                  <td className="p-2 font-mono text-xs text-slate-400">{o.tradeNo || "—"}</td>
+                  <td className="p-2 whitespace-nowrap">
+                    <div className="flex gap-2">
+                      <button
+                        disabled={busyId === o.id}
+                        onClick={() => syncOne(o)}
+                        className="rounded-lg border border-white/15 px-2 py-1 text-xs hover:bg-white/10 disabled:opacity-50"
+                      >
+                        查单
+                      </button>
+                      {canRefund && remain > 0 && (
+                        <button
+                          disabled={busyId === o.id}
+                          onClick={() => { setRefundFor(o); setRefundAmount(String(remain)); setRefundReason(""); }}
+                          className="rounded-lg border border-rose-400/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                        >
+                          退款
+                        </button>
+                      )}
+                      {(o.refunds || []).length > 0 && (o.refunds || []).some((r) => r.status !== "SUCCESS") && (
+                        <button
+                          disabled={busyId === o.id}
+                          onClick={() => syncRefund(o)}
+                          title="向微信查询该订单的退款结果并更新本地状态"
+                          className="rounded-lg border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                        >
+                          同步退款
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={7} className="p-4 text-center text-slate-500">暂无订单</td></tr>
+            )}
+            {loading && <tr><td colSpan={7} className="p-4 text-center text-slate-500">加载中…</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {refundFor && (
+        <div className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/5 p-4">
+          <h4 className="font-semibold text-white">订单退款 · {refundFor.id}</h4>
+          <p className="mt-1 text-xs text-slate-400">
+            商品：{refundFor.productTitle}｜订单金额 ¥{refundFor.amount}｜可退余额 ¥
+            {Math.round((refundFor.amount - (refundFor.refundedAmount || 0)) * 100) / 100}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+              placeholder="退款金额（元）"
+              className="input-base max-w-[10rem]"
+            />
+            <input
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              placeholder="退款原因（选填）"
+              className="input-base max-w-xs flex-1"
+            />
+            <button onClick={doRefund} disabled={busyId === refundFor.id} className="btn-ghost py-2 text-sm disabled:opacity-50">
+              确认退款
+            </button>
+            <button onClick={() => setRefundFor(null)} className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10">
+              取消
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">退款将原路退回（微信支付余额/银行卡），一般 1-3 个工作日到账。</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function fmt(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 type PayItem = { paid: boolean; amount: number };
 type PayForm = { qrImageUrl: string; qrNote: string; items: Record<string, PayItem> };
 type Billable = { id: string; title: string; icon: string; type: string };
@@ -1687,6 +2300,7 @@ function PayConfigManager() {
       const list: Billable[] = [
         ...items,
         { id: "sched", title: "智能排课系统", icon: "🗓️", type: "tool" },
+        { id: "balance", title: "均衡分班系统", icon: "⚖️", type: "tool" },
       ];
       setProducts(list);
       const saved = (c.items || {}) as Record<string, PayItem>;
@@ -1762,15 +2376,20 @@ function PayConfigManager() {
           商户密钥等敏感信息请在 Vercel 项目「环境变量」中配置，<b className="text-slate-200">切勿</b>在此处填写。
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <ChannelBadge label="微信支付" on={!!payStatus?.wechat} active={payStatus?.provider === "wechat"} envs={["WECHAT_PAY_MCH_ID", "WECHAT_PAY_APP_ID", "WECHAT_PAY_API_V3_KEY", "WECHAT_PAY_SERIAL", "WECHAT_PAY_PRIVATE_KEY", "WECHAT_PAY_CERT"]} />
+          <ChannelBadge label="微信支付" on={!!payStatus?.wechat} active={payStatus?.provider === "wechat"} envs={["WECHAT_PAY_MCH_ID", "WECHAT_PAY_APP_ID", "WECHAT_PAY_API_V3_KEY", "WECHAT_PAY_SERIAL", "WECHAT_PAY_PRIVATE_KEY", "WECHAT_PAY_PUBKEY_ID + WECHAT_PAY_PUBKEY（推荐）/ WECHAT_PAY_CERT"]} />
           <ChannelBadge label="支付宝" on={!!payStatus?.alipay} active={payStatus?.provider === "alipay"} envs={["ALIPAY_APP_ID", "ALIPAY_PRIVATE_KEY", "ALIPAY_PUBLIC_KEY"]} />
           <span className={`rounded-full px-3 py-1 text-sm ${payStatus?.provider ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
             {payStatus?.provider ? `当前通道：${payStatus.provider === "wechat" ? "微信支付" : payStatus.provider === "alipay" ? "支付宝" : "模拟(mock)"}` : "当前：未配置真实通道"}
           </span>
+          {payStatus?.wechatMode && (
+            <span className="rounded-full bg-brand-violet/20 px-3 py-1 text-sm text-brand-violet">
+              验签模式：{payStatus.wechatMode === "pubkey" ? "微信支付公钥（推荐）" : "平台证书"}
+            </span>
+          )}
         </div>
         {!payStatus?.provider && (
           <p className="mt-3 text-xs text-amber-400">
-            提示：未配置真实通道时，前台下载会提示「支付通道未配置」。请到 Vercel 设置 <code className="rounded bg-black/30 px-1">PAY_PROVIDER=wechat|alipay</code> 并补全对应商户密钥后重新部署。
+            提示：未配置真实通道时会降级为「自助扫码」（后台上传收款二维码）。如需真实收款，请配置 <code className="rounded bg-black/30 px-1">PAY_PROVIDER=wechat</code> 及对应商户凭据。验签凭据二选一：<code className="rounded bg-black/30 px-1">WECHAT_PAY_PUBKEY_ID + WECHAT_PAY_PUBKEY</code>（推荐，商户平台可直接复制）或 <code className="rounded bg-black/30 px-1">WECHAT_PAY_CERT</code>（平台证书）。
           </p>
         )}
 

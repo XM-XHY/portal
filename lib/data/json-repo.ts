@@ -114,10 +114,20 @@ export class JsonRepo implements Repo {
     return true;
   }
 
+  async setAdminRole(id: string, role: Admin["role"]): Promise<boolean> {
+    const db = await this.read();
+    const admin = db.admins.find((a) => a.id === id);
+    if (!admin) return false;
+    admin.role = role;
+    await this.write(db);
+    return true;
+  }
+
   async addAdmin(input: {
     username: string;
     password: string;
     role: Admin["role"];
+    perms?: string[];
   }): Promise<Admin> {
     const db = await this.read();
     const username = input.username.trim();
@@ -129,10 +139,21 @@ export class JsonRepo implements Repo {
       username,
       role: input.role,
       pwHash: hash(input.password),
+      perms: input.perms,
     };
     db.admins.push(admin);
     await this.write(db);
     return admin;
+  }
+
+  async setAdminPerms(id: string, perms: string[] | null): Promise<boolean> {
+    const db = await this.read();
+    const admin = db.admins.find((a) => a.id === id);
+    if (!admin) return false;
+    // 传 null 表示清除覆盖、回退角色默认；JSON 序列化会丢弃 undefined 键
+    admin.perms = perms ?? undefined;
+    await this.write(db);
+    return true;
   }
 
   async removeAdmin(id: string): Promise<boolean> {
@@ -180,7 +201,8 @@ export class JsonRepo implements Repo {
   async addSearchLog(q: string, ip: string): Promise<void> {
     const db = await this.read();
     db.searchLogs.unshift({ q, at: new Date().toISOString(), ip });
-    if (db.searchLogs.length > 500) db.searchLogs.length = 500;
+    // 看板统计口径依赖全量日志，不再截断到 500 条；仅设一个防失控的硬上限
+    if (db.searchLogs.length > 50000) db.searchLogs.length = 50000;
     await this.write(db);
   }
 
@@ -194,7 +216,27 @@ export class JsonRepo implements Repo {
     return (await this.read()).contents.find((c) => c.id === id) || null;
   }
 
+  /** 仅 upsert 传入条目，保留其他数据 */
   async saveContents(items: ContentItem[]): Promise<ContentItem[]> {
+    const db = await this.read();
+    const map = new Map(db.contents.map((c) => [c.id, c]));
+    for (const it of items) map.set(it.id, it);
+    db.contents = [...map.values()];
+    await this.write(db);
+    return db.contents;
+  }
+
+  /** 按 id 精确删除 */
+  async deleteContents(ids: string[]): Promise<void> {
+    const set = new Set(ids.filter(Boolean));
+    if (!set.size) return;
+    const db = await this.read();
+    db.contents = db.contents.filter((c) => !set.has(c.id));
+    await this.write(db);
+  }
+
+  /** 整体替换（仅后台全量保存/删除条目时使用） */
+  async replaceContents(items: ContentItem[]): Promise<ContentItem[]> {
     const db = await this.read();
     db.contents = items;
     await this.write(db);

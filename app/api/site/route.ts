@@ -22,7 +22,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "settings.manage")) {
+  if (!can(admin, "settings.manage")) {
     return NextResponse.json({ error: "无权限：需要系统设置权限" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));

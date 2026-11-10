@@ -23,15 +23,21 @@ export class SupabaseRepo implements Repo {
   private sb: SupabaseClient;
   private seedChecked = false;
 
-  constructor(url: string, key: string) {
+  /**
+   * @param fetchImpl 可选的底层 fetch 覆盖。接国产 CloudBase PG 时传入
+   *   `createCloudBasePgFetch()`，把 supabase-js 的 `/rest/v1/...` 重写到国产网关；
+   *   不传则走原来的 Supabase 直连。仓储层其余代码两种模式完全共用。
+   */
+  constructor(url: string, key: string, fetchImpl?: (input: any, init?: any) => Promise<Response>) {
     this.sb = createClient(url, key, {
       auth: { persistSession: false },
       // 关键：Next.js 14 默认对服务端 fetch 开启 Data Cache（force-cache），
-      // 会把 Supabase 的读请求结果缓存住，导致后台改完数据、前台仍读到旧值
-      // （表现为"保存失败"）。这里强制所有请求不走缓存。
+      // 会把读请求结果缓存住，导致后台改完数据、前台仍读到旧值
+      // （表现为"保存失败"）。两种模式都必须强制不走缓存。
       global: {
-        fetch: (input: any, init: any) =>
-          fetch(input, { ...init, cache: "no-store" }),
+        fetch: fetchImpl
+          ? fetchImpl
+          : (input: any, init: any) => fetch(input, { ...init, cache: "no-store" }),
       },
     });
   }
@@ -110,25 +116,65 @@ export class SupabaseRepo implements Repo {
     return true;
   }
 
+  async setAdminRole(id: string, role: Admin["role"]): Promise<boolean> {
+    const { data, error } = await this.sb
+      .from("admins")
+      .update({ role })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return false;
+    return true;
+  }
+
   async addAdmin(input: {
     username: string;
     password: string;
     role: Admin["role"];
+    perms?: string[];
   }): Promise<Admin> {
     const admins = await this.getAdmins();
     const username = input.username.trim();
     if (admins.some((a) => a.username === username)) {
       throw new Error("用户名已存在");
     }
-    const row = {
+    const base = {
       id: `a_${crypto.randomUUID().slice(0, 8)}`,
       username,
       role: input.role,
       pw_hash: hash(input.password),
     };
-    const { data, error } = await this.sb.from("admins").insert(row).select().single();
-    if (error || !data) throw new Error(error?.message || "创建账号失败");
-    return fromAdminRow(data);
+    const row = { ...base, perms: input.perms ?? null };
+    try {
+      const { data, error } = await this.sb.from("admins").insert(row).select().single();
+      if (error) throw error;
+      return fromAdminRow(data);
+    } catch (e: any) {
+      // 兼容尚未执行迁移脚本（无 perms 列）的旧表：去掉 perms 重试，权限按角色默认生效
+      if (missingColumn(e)) {
+        const { data, error } = await this.sb.from("admins").insert(base).select().single();
+        if (error || !data) throw new Error(error?.message || "创建账号失败");
+        return fromAdminRow(data);
+      }
+      throw new Error(e?.message || "创建账号失败");
+    }
+  }
+
+  async setAdminPerms(id: string, perms: string[] | null): Promise<boolean> {
+    try {
+      const { data, error } = await this.sb
+        .from("admins")
+        .update({ perms: perms === null ? null : perms })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error || !data) return false;
+      return true;
+    } catch (e: any) {
+      // 迁移未执行时 perms 列不存在：逐账号权限暂不可用，但角色默认权限仍生效
+      if (missingColumn(e)) return false;
+      return false;
+    }
   }
 
   async removeAdmin(id: string): Promise<boolean> {
@@ -179,13 +225,26 @@ export class SupabaseRepo implements Repo {
   }
 
   // ---------- 搜索日志 ----------
+  /**
+   * 看板统计依赖全量日志，原来 `.limit(500)` 会让「累计搜索 / 热词 / 转化率」
+   * 只反映最近 500 条。这里分页拉全量（Supabase 单次上限 1000 行），
+   * 并设 20 万条硬上限防止异常数据量拖垮请求。
+   */
   async getSearchLogs(): Promise<SearchLog[]> {
-    const { data } = await this.sb
-      .from("search_logs")
-      .select("*")
-      .order("at", { ascending: false })
-      .limit(500);
-    return (data || []).map((d: any) => ({ q: d.q, at: d.at, ip: d.ip }));
+    const all: SearchLog[] = [];
+    const PAGE = 1000;
+    for (let from = 0; from <= 200000; from += PAGE) {
+      const { data, error } = await this.sb
+        .from("search_logs")
+        .select("*")
+        .order("at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const rows = data || [];
+      for (const d of rows) all.push({ q: d.q, at: d.at, ip: d.ip });
+      if (rows.length < PAGE) break;
+    }
+    return all;
   }
 
   async addSearchLog(q: string, ip: string): Promise<void> {
@@ -212,18 +271,42 @@ export class SupabaseRepo implements Repo {
     return data ? fromContentRow(data) : null;
   }
 
+  /** 仅 upsert 传入条目，绝不删除其他行（见 Repo 接口注释） */
   async saveContents(items: ContentItem[]): Promise<ContentItem[]> {
     const rows = items.map(toContentRow);
     if (rows.length) {
       const { error } = await this.sb.from("contents").upsert(rows, { onConflict: "id" });
       if (error) throw new Error(`contents 写入失败: ${error.message} (code=${error.code})`);
     }
+    return items;
+  }
+
+  /** 按 id 精确删除 */
+  async deleteContents(ids: string[]): Promise<void> {
+    const list = ids.filter(Boolean);
+    if (!list.length) return;
+    const CHUNK = 200;
+    for (let i = 0; i < list.length; i += CHUNK) {
+      const { error } = await this.sb.from("contents").delete().in("id", list.slice(i, i + CHUNK));
+      if (error) throw new Error(`contents 删除失败: ${error.message} (code=${error.code})`);
+    }
+  }
+
+  /** 整体替换：upsert 后删除未出现在列表中的行（仅后台全量保存/删除条目时使用） */
+  async replaceContents(items: ContentItem[]): Promise<ContentItem[]> {
+    await this.saveContents(items);
     const ids = items.map((i) => i.id);
     if (ids.length === 0) {
       await this.sb.from("contents").delete().neq("id", "__impossible__");
-    } else {
-      const list = `(${ids.map((id) => `"${id}"`).join(",")})`;
-      await this.sb.from("contents").delete().not("id", "in", list);
+      return items;
+    }
+    // 分批构造 NOT IN 条件，避免 URL 过长
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const part = ids.slice(i, i + CHUNK);
+      const list = `(${part.map((id) => `"${id}"`).join(",")})`;
+      const { error } = await this.sb.from("contents").delete().not("id", "in", list);
+      if (error) throw new Error(`contents 清理失败: ${error.message} (code=${error.code})`);
     }
     return items;
   }
@@ -261,6 +344,18 @@ export class SupabaseRepo implements Repo {
   }
 }
 
+// ---------- 兼容辅助 ----------
+
+/** 判断错误是否因 admins 表缺少 perms 列（迁移脚本尚未执行）。
+ * 此时权限按角色默认生效，逐账号覆盖暂不可用，但不阻断主流程。 */
+function missingColumn(e: any): boolean {
+  const m = e?.message || e?.error_description || "";
+  return (
+    e?.code === "42703" ||
+    /column .*perms.*does not exist|relation .*admins.*does not exist/i.test(m)
+  );
+}
+
 // ---------- 行映射 ----------
 function toSiteRow(s: SiteInfo) {
   return {
@@ -285,7 +380,13 @@ function fromSiteRow(d: any): SiteInfo {
   };
 }
 function fromAdminRow(d: any): Admin {
-  return { id: d.id, username: d.username, role: d.role, pwHash: d.pw_hash };
+  return {
+    id: d.id,
+    username: d.username,
+    role: d.role,
+    pwHash: d.pw_hash,
+    perms: Array.isArray(d.perms) ? (d.perms as string[]) : undefined,
+  };
 }
 function fromLeadRow(d: any): Lead {
   return {

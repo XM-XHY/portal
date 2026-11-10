@@ -161,11 +161,9 @@ export function templateCsv(kind: TmplKind): string {
 /* ============== 文件解析（兼容 .xlsx/.xls/.csv） ============== */
 
 async function readSheetRows(buf: ArrayBuffer | Buffer): Promise<string[][]> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.read(buf, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, blankrows: false, defval: "" });
-  return rows.filter((r) => Array.isArray(r) && r.some((c) => String(c ?? "").trim() !== ""));
+  // 表格解析统一走 lib/sheet（exceljs），替换存在 high 漏洞且无补丁的 xlsx@0.18.5
+  const { readRows } = await import("./sheet");
+  return readRows(buf);
 }
 
 function cellStr(v: unknown): string {
@@ -549,9 +547,10 @@ export function buildRoomView(state: SchedState): Record<string, Cell[][]> {
 
 /* ============== Excel 工作簿构建（纯函数，客户端/服务端共用） ============== */
 
-/** 构建课表 Excel 工作簿（全校：每班一表 + 教师课表 + 教室课表）。返回 xlsx 工作簿对象。 */
-export async function buildScheduleWorkbook(state: SchedState): Promise<unknown> {
-  const XLSX = await import("xlsx");
+/** 构建课表 Excel 工作簿（全校：每班一表 + 教师课表 + 教室课表）。返回 xlsx 二进制。 */
+export async function buildScheduleWorkbook(state: SchedState): Promise<ArrayBuffer> {
+  // 表格写出统一走 lib/sheet（exceljs），替换存在 high 漏洞且无补丁的 xlsx@0.18.5
+  const sheetLib = await import("./sheet");
   const days = state.rules.days;
   const ppd = state.rules.periodsPerDay;
   const dayNames = Array.from({ length: days }, (_, i) => `周${"一二三四五六日"[i]}`);
@@ -559,7 +558,7 @@ export async function buildScheduleWorkbook(state: SchedState): Promise<unknown>
   const roomName = new Map(state.rooms.map((r) => [r.id, r.name]));
   const className = new Map(state.classes.map((c) => [c.id, c.name]));
 
-  const wb = XLSX.utils.book_new();
+  const sheets: import("./sheet").SheetSpec[] = [];
 
   function cellText(cell: Cell, view: "class" | "teacher" | "room"): string {
     if (!cell) return "";
@@ -586,18 +585,20 @@ export async function buildScheduleWorkbook(state: SchedState): Promise<unknown>
     if (!ids.length) return;
     for (const id of ids) {
       const g = grid[id];
-      const rows: any[] = [];
+      const rows: string[][] = [];
       rows.push([`${labelOf(id)} 课表`, ...dayNames]);
       for (let p = 0; p < ppd; p++) {
         const time = state.rules.periodTimes[p] || "";
-        const row: any[] = [`第${p + 1}节\n${time}`];
+        const row: string[] = [`第${p + 1}节\n${time}`];
         for (let d = 0; d < days; d++) row.push(cellText(g[d]?.[p] || null, view));
         rows.push(row);
       }
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [{ wch: 14 }, ...Array.from({ length: days }, () => ({ wch: 18 }))];
-      ws["!rows"] = [{ hpt: 22 }, ...Array.from({ length: ppd }, () => ({ hpt: 34 }))];
-      XLSX.utils.book_append_sheet(wb, ws, `${labelOf(id)}`.slice(0, 28));
+      sheets.push({
+        name: `${labelOf(id)}`,
+        rows,
+        colWidths: [14, ...Array.from({ length: days }, () => 18)],
+        rowHeights: [22, ...Array.from({ length: ppd }, () => 34)],
+      });
     }
   }
 
@@ -609,5 +610,5 @@ export async function buildScheduleWorkbook(state: SchedState): Promise<unknown>
     addSheet(rv, (id) => roomName.get(id) || id, "room");
   }
 
-  return wb;
+  return sheetLib.buildWorkbookBuffer(sheets);
 }

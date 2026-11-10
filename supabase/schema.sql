@@ -24,7 +24,9 @@ create table if not exists admins (
   id text primary key,
   username text unique not null,
   role text not null,
-  pw_hash text not null
+  pw_hash text not null,
+  -- 逐账号权限覆盖：为 NULL 时沿用角色默认权限；写入具体数组时覆盖角色默认
+  perms jsonb
 );
 
 -- 获客线索（访客公开提交）

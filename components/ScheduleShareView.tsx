@@ -94,7 +94,12 @@ export default function ScheduleShareView({ state, token }: { state: SchedState;
           </button>
         ))}
         <span className="ml-auto flex gap-2">
-          <a href={`/api/schedule/export?token=${token}`} className="btn-ghost py-2 text-sm">⬇ Excel</a>
+          <button
+            onClick={() => {
+              window.location.href = `/api/schedule/export?token=${encodeURIComponent(token)}`;
+            }}
+            className="btn-ghost py-2 text-sm"
+          >⬇ Excel</button>
           <button onClick={() => window.print()} className="btn-ghost py-2 text-sm">🖨️ 打印/PDF</button>
         </span>
       </div>

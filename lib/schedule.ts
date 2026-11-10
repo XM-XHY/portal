@@ -49,38 +49,115 @@ export async function saveScheduleState(state: import("./schedule-engine").Sched
   await saveContents(list);
 }
 
-/* ============== 只读分享快照 ============== */
+/* ============== 只读分享快照（支持有效期与吊销） ============== */
 
-export async function saveShareSnapshot(state: import("./schedule-engine").SchedState, title: string): Promise<string> {
-  const token = newId("sh").replace(/[^a-zA-Z0-9]/g, "").slice(0, 16) || Math.random().toString(36).slice(2, 12);
-  const list = await getContents();
-  const item: ContentItem = {
-    id: token,
-    type: SCHED_SHARE_TYPE,
-    title: title || "课表分享",
-    tag: "",
-    summary: "",
-    body: JSON.stringify({ state, title, createdAt: new Date().toISOString() }),
-    icon: "🔗",
-    tags: [],
-    client: "",
-    industry: "",
-    result: "",
-    at: new Date().toISOString().slice(0, 10),
-    order: 1,
-  };
-  list.unshift(item);
-  await saveContents(list);
-  return token;
-}
+export type ShareMeta = {
+  token: string;
+  title: string;
+  createdAt: string;
+  /** 到期时间 ISO；历史记录没有该字段时视为永久有效 */
+  expiresAt?: string;
+  revoked?: boolean;
+  owner?: string;
+  state?: import("./schedule-engine").SchedState;
+};
 
-export async function getShareSnapshot(token: string): Promise<import("./schedule-engine").SchedState | null> {
-  const list = await getContents(SCHED_SHARE_TYPE);
-  const item = list.find((x) => x.id === token);
+export type ShareSummary = {
+  token: string;
+  title: string;
+  createdAt: string;
+  expiresAt?: string;
+  expired: boolean;
+  revoked: boolean;
+  owner?: string;
+};
+
+function parseShare(item: ContentItem | undefined): ShareMeta | null {
   if (!item?.body) return null;
   try {
-    return (JSON.parse(item.body) as { state: import("./schedule-engine").SchedState }).state;
+    const m = JSON.parse(item.body) as ShareMeta;
+    return m && m.state ? { ...m, token: item.id, title: m.title || item.title } : null;
   } catch {
     return null;
   }
+}
+
+export function shareIsActive(m: ShareMeta): boolean {
+  if (m.revoked) return false;
+  if (m.expiresAt && new Date(m.expiresAt).getTime() < Date.now()) return false;
+  return true;
+}
+
+/** 创建分享快照。默认 30 天有效； expiresDays 可传 1-365。 */
+export async function saveShareSnapshot(
+  state: import("./schedule-engine").SchedState,
+  title: string,
+  opts: { owner?: string; expiresDays?: number } = {}
+): Promise<string> {
+  const token = newId("sh").replace(/[^a-zA-Z0-9]/g, "").slice(0, 16) || Math.random().toString(36).slice(2, 12);
+  const now = new Date();
+  const days = Math.min(365, Math.max(1, Number(opts.expiresDays) || 30));
+  const meta: ShareMeta = {
+    token,
+    title: title || "课表分享",
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + days * 86400_000).toISOString(),
+    revoked: false,
+    owner: opts.owner || "",
+    state,
+  };
+  const item: ContentItem = {
+    id: token,
+    type: SCHED_SHARE_TYPE,
+    title: meta.title,
+    tag: "",
+    summary: `${days} 天有效`,
+    body: JSON.stringify(meta),
+    icon: "🔗",
+    tags: [],
+    client: opts.owner || "",
+    industry: "",
+    result: "",
+    at: now.toISOString().slice(0, 10),
+    order: 1,
+  };
+  // 只 upsert 这一条，避免全量写回时把其它实例刚写入的数据覆盖掉
+  await saveContents([item]);
+  return token;
+}
+
+/** 读取有效快照；已过期 / 已吊销 / 不存在一律返回 null */
+export async function getShareSnapshot(token: string): Promise<import("./schedule-engine").SchedState | null> {
+  const item = (await getContents(SCHED_SHARE_TYPE)).find((x) => x.id === token);
+  const meta = parseShare(item);
+  if (!meta || !shareIsActive(meta)) return null;
+  return meta.state!;
+}
+
+/** 后台列出全部分享（不含课表正文） */
+export async function listShares(): Promise<ShareSummary[]> {
+  const list = await getContents(SCHED_SHARE_TYPE);
+  return list
+    .map((item) => ({ item, meta: parseShare(item) }))
+    .filter((x): x is { item: ContentItem; meta: ShareMeta } => !!x.meta)
+    .map(({ meta }) => ({
+      token: meta.token,
+      title: meta.title,
+      createdAt: meta.createdAt,
+      expiresAt: meta.expiresAt,
+      expired: !!meta.expiresAt && new Date(meta.expiresAt).getTime() < Date.now(),
+      revoked: !!meta.revoked,
+      owner: meta.owner,
+    }))
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/** 吊销 / 恢复分享链接 */
+export async function setShareRevoked(token: string, revoked: boolean): Promise<boolean> {
+  const item = (await getContents(SCHED_SHARE_TYPE)).find((x) => x.id === token);
+  const meta = parseShare(item);
+  if (!item || !meta) return false;
+  meta.revoked = revoked;
+  await saveContents([{ ...item, body: JSON.stringify(meta) }]);
+  return true;
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContent, getContents } from "@/lib/store";
+import { pageMeta } from "@/lib/seo";
 import LeadForm from "@/components/LeadForm";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,13 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const item = await getContent(params.id);
   if (!item) return { title: "案例详情" };
-  return { title: item.title, description: item.summary };
+  return pageMeta({
+    title: item.title,
+    description: item.summary,
+    path: `/cases/${item.id}`,
+    keywords: item.tags?.length ? item.tags : item.industry ? [item.industry] : undefined,
+    type: "article",
+  });
 }
 
 export default async function CaseDetail({ params }: { params: { id: string } }) {

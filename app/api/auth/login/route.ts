@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdmins, verifyPassword, appendAudit } from "@/lib/store";
 import { signSession, SESSION_COOKIE, clientIp } from "@/lib/session";
+import { lockedFor, noteFailure, clearFailures } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-// 简易防暴破：按 账号+IP 记录失败次数，超阈值锁定一段时间（演示用，生产应换 Redis/限流中间件）
+// 防暴破：按 账号+IP 累计失败次数，超阈值锁定 15 分钟。
+// 计数写入共享存储，云托管多实例下不会再出现「换个实例就能继续撞库」。
 const MAX_FAIL = 5;
 const LOCK_MS = 15 * 60 * 1000;
-const failMap = new Map<string, { count: number; until: number }>();
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json().catch(() => ({}));
@@ -16,34 +17,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "缺少账号或密码" }, { status: 400 });
   }
 
-  const key = `${username}@${ip}`;
-  const fail = failMap.get(key);
-  if (fail && fail.until > Date.now()) {
-    const mins = Math.ceil((fail.until - Date.now()) / 60000);
+  const key = `login:${username}@${ip}`;
+  const lockedSeconds = await lockedFor(key);
+  if (lockedSeconds > 0) {
+    const mins = Math.ceil(lockedSeconds / 60);
     return NextResponse.json(
       { error: `尝试次数过多，请 ${mins} 分钟后再试` },
-      { status: 429 }
+      { status: 429, headers: { "Retry-After": String(lockedSeconds) } }
     );
   }
 
   const admins = await getAdmins();
   const admin = admins.find((a) => a.username === username);
   if (!admin || !verifyPassword(password, admin.pwHash)) {
-    const f = failMap.get(key) || { count: 0, until: 0 };
-    f.count += 1;
-    if (f.count >= MAX_FAIL) f.until = Date.now() + LOCK_MS;
-    failMap.set(key, f);
+    await noteFailure(key, MAX_FAIL, LOCK_MS);
     await appendAudit({
       actor: username,
       action: "login.fail",
       target: "auth",
       ip,
-      detail: f.count >= MAX_FAIL ? "locked" : `fail#${f.count}`,
+      detail: "账号或密码错误",
     });
     return NextResponse.json({ error: "账号或密码错误" }, { status: 401 });
   }
 
-  failMap.delete(key);
+  await clearFailures(key);
   const token = signSession(admin.id);
   await appendAudit({
     actor: admin.username,
@@ -55,6 +53,7 @@ export async function POST(req: NextRequest) {
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 8,
   });

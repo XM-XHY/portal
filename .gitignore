@@ -38,3 +38,21 @@ next-env.d.ts
 
 # CloudBase 部署工具会自动改写此文件并写入真实环境 ID，不入库
 cloudbaserc.json
+
+# 商户私钥/平台证书等凭据文件目录：目录本身入库（保证 Docker 构建可 COPY），
+# 但目录内所有密钥文件一律禁止入库。
+credentials/*.pem
+credentials/*.p12
+credentials/*.key
+credentials/*.crt
+*.p12
+
+# 测试覆盖率报告（vitest --coverage 生成物，属构建产物不入库）
+coverage/
+coverage
+# 本地测试/构建临时产物
+*.tsbuildinfo
+build.log
+audit-after.json
+semgrep-local.json
+sast.txt

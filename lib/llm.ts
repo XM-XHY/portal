@@ -8,10 +8,16 @@
  * ── 配置方式（三选一，优先级从高到低）──────────────────────────
  * 1) 完全自定义：LLM_BASE_URL + LLM_API_KEY (+ LLM_MODEL)
  *    例：接自建/私有化模型、或厂商端点变更时
- * 2) 指定厂商：LLM_PROVIDER=deepseek|qwen|doubao|zhipu|kimi|minimax|openai
+ * 2) 指定厂商：LLM_PROVIDER=deepseek|siliconflow|qwen|doubao|zhipu|kimi|minimax|openai
  *    + 对应厂商的密钥环境变量（见下方 keyEnv）
- * 3) 自动探测（默认）：按 DEEPSEEK → QWEN → DOUBAO → ZHIPU → KIMI → MINIMAX → OPENAI
- *    顺序，取第一个配了密钥的厂商。把国产排在前，保证国内部署默认走国产。
+ * 3) 自动探测（默认）：按 DEEPSEEK → QWEN → DOUBAO → ZHIPU → KIMI → MINIMAX
+ *    → SILICONFLOW → OPENAI 顺序，取第一个配了密钥的厂商。把国产排在前，保证国内部署默认走国产。
+ *
+ * ── 零成本方案（不想付费时）────────────────────────────────
+ * · 硅基流动 SILICONFLOW_API_KEY：9B 以下模型（Qwen2.5-7B 等）永久免费不限量
+ * · 智谱 ZHIPU_API_KEY：glm-4.5-flash / glm-4.7-flash 永久免费（下方已默认 flash）
+ * · 腾讯混元 Lite、百度千帆 ERNIE-Lite、讯飞星火 Lite 亦各有永久免费档
+ * 以上任选其一即可让 AI 客服/检索摘要跑起来且长期不产生费用。
  *
  * ⚠️ model 型号各家迭代很快，下表为 2026-11 核对结果。
  *    若厂商已改名导致 404，用 LLM_MODEL 环境变量覆盖即可，无需改代码。
@@ -19,6 +25,7 @@
 
 export type LlmProviderId =
   | "deepseek"
+  | "siliconflow"
   | "qwen"
   | "doubao"
   | "zhipu"
@@ -45,10 +52,24 @@ export const LLM_PRESETS: Record<Exclude<LlmProviderId, "custom">, LlmPreset> = 
     id: "deepseek",
     label: "DeepSeek 深度求索",
     baseUrl: "https://api.deepseek.com/v1",
-    // 注意：deepseek-chat / deepseek-reasoner 已于 2026-07-24 弃用，勿再使用
-    model: "deepseek-v4-flash",
+    // 官方当前模型名为 deepseek-flash（V4.1-Flash）。
+    // ⚠️ deepseek-chat / deepseek-reasoner 已于 2026-07-24 退役（请求直接失败）；
+    //    deepseek-v4-flash 为遗留别名，仍会被路由到 V4.1-Flash 并计费，但官方建议迁移到 deepseek-flash。
+    // 价格（非高峰，每百万 token）：缓存命中输入 ¥0.02 / 未命中输入 ¥1 / 输出 ¥4；工作日高峰翻倍。
+    // 需预付费充值（支付宝/微信），非免费。
+    model: "deepseek-flash",
     keyEnv: "DEEPSEEK_API_KEY",
     console: "https://platform.deepseek.com",
+  },
+  siliconflow: {
+    id: "siliconflow",
+    label: "硅基流动 SiliconCloud（含永久免费档）",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    // 9B 以下模型永久免费不限量；新用户另赠 2000 万 token。零成本起步首选。
+    // 想换更强模型：LLM_MODEL=Qwen3-8B / deepseek-ai/DeepSeek-V4 等（部分付费）
+    model: "Qwen2.5-7B-Instruct",
+    keyEnv: "SILICONFLOW_API_KEY",
+    console: "https://cloud.siliconflow.cn",
   },
   qwen: {
     id: "qwen",
@@ -111,6 +132,7 @@ const PROBE_ORDER: Exclude<LlmProviderId, "custom">[] = [
   "zhipu",
   "kimi",
   "minimax",
+  "siliconflow",
   "openai",
 ];
 
@@ -224,6 +246,13 @@ export async function llmChat(args: LlmChatArgs): Promise<string | null> {
         messages: [{ role: "system", content: system }, ...messages],
         temperature,
         max_tokens: maxTokens,
+        // 智谱 GLM-4.5 系列默认开启「思考模式」：token 会先被 reasoning_content 吃掉，
+        // 在 max_tokens 较小时 content 直接为空（finish_reason=length），
+        // 表现为「AI 客服没回答」。客服问答与检索摘要不需要推理链，默认关闭。
+        // 需要推理时设 LLM_THINKING=on。
+        ...(cfg.provider === "zhipu" && process.env.LLM_THINKING !== "on"
+          ? { thinking: { type: "disabled" } }
+          : {}),
       }),
       signal: ctrl.signal,
       cache: "no-store",

@@ -1,0 +1,39 @@
+rules:
+  - id: hardcoded-secret-env-fallback
+    severity: ERROR
+    languages: [typescript]
+    message: "Secret falls back to a hardcoded string literal; in production this enables forgery (SEC-03)."
+    patterns:
+      - pattern: process.env.$X || "$Y"
+  - id: hardcoded-secret-env-fallback-trim
+    severity: ERROR
+    languages: [typescript]
+    message: "Secret falls back to a hardcoded string literal via .trim(); in production this enables forgery (SEC-03)."
+    patterns:
+      - pattern: process.env.$X?.trim() || "$Y"
+  - id: weak-random-token
+    severity: WARNING
+    languages: [typescript]
+    message: "Math.random() is not cryptographically secure; never use for tokens/secrets/nonces."
+    pattern: Math.random()
+  - id: dangerous-eval
+    severity: ERROR
+    languages: [typescript]
+    message: "Avoid eval / Function; risk of code injection."
+    patterns:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: child-process-exec
+    severity: INFO
+    languages: [typescript]
+    message: "child_process usage; ensure arguments are never attacker-controlled (command injection)."
+    patterns:
+      - pattern: exec(...)
+      - pattern: execSync(...)
+      - pattern: spawn(...)
+  - id: jwt-none-alg
+    severity: ERROR
+    languages: [typescript]
+    message: "Insecure JWT 'none' algorithm detected."
+    patterns:
+      - pattern: alg: "none"

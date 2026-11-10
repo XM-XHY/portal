@@ -1,4 +1,4 @@
-export type Role = "super" | "editor" | "lead" | "viewer" | "employee";
+export type Role = "super" | "editor" | "lead" | "viewer" | "employee" | "teacher";
 
 export type SiteInfo = {
   companyName: string;
@@ -10,7 +10,14 @@ export type SiteInfo = {
   icp: string;
 };
 
-export type Admin = { id: string; username: string; role: Role; pwHash: string };
+export type Admin = {
+  id: string;
+  username: string;
+  role: Role;
+  pwHash: string;
+  /** 逐账号权限覆盖：存在时以该数组为准，覆盖角色默认权限；为空数组表示显式收回全部权限；为 undefined 时回退到角色默认 */
+  perms?: string[];
+};
 
 export type Lead = {
   id: string;
@@ -32,8 +39,37 @@ export type Lead = {
  * - sched_share 排课只读分享快照（body 存 state JSON）
  * - paycfg 产品付费配置（body 存收款二维码 + 各产品下载付费金额）
  * - order 真实支付订单（body 存订单 JSON，含网关流水号与状态，零 DDL）
+ * - balance_pub 均衡分班发布快照（body 存 {entries:[{name,className}]} JSON，供家长扫码查询）
+ * - hub_material 知识中枢 AI 生成的材料（body 存生成结果 JSON，owner 存账号）
+ * - rate 分布式限流计数桶（系统内部类型，不出现在后台内容列表）
  */
-export type ContentType = "news" | "product" | "solution" | "case" | "kb" | "pdoc" | "sched" | "sched_share" | "paycfg" | "order";
+export type ContentType =
+  | "news"
+  | "product"
+  | "solution"
+  | "case"
+  | "kb"
+  | "pdoc"
+  | "sched"
+  | "sched_share"
+  | "paycfg"
+  | "order"
+  | "balance_pub"
+  | "mp_bind"
+  | "hub_material"
+  | "rate";
+
+/** 系统内部类型：后台 CMS 列表/删除/导入时一律跳过，避免误删或污染展示 */
+export const SYSTEM_CONTENT_TYPES: ContentType[] = [
+  "sched",
+  "sched_share",
+  "paycfg",
+  "order",
+  "balance_pub",
+  "mp_bind",
+  "hub_material",
+  "rate",
+];
 
 /**
  * 统一内容实体：资讯（news）、产品（product）、解决方案（solution）、案例（case）共用。
@@ -101,8 +137,14 @@ export interface Repo {
   updateSite(patch: Partial<SiteInfo>): Promise<SiteInfo>;
   getAdmins(): Promise<Admin[]>;
   setAdminPassword(id: string, newPw: string): Promise<boolean>;
-  /** 新增账号（管理员或员工）；用户名重复时抛错 */
-  addAdmin(input: { username: string; password: string; role: Role }): Promise<Admin>;
+  /** 修改账号角色；不存在返回 false */
+  setAdminRole(id: string, role: Role): Promise<boolean>;
+  /** 新增账号（管理员 / 员工 / 教师）；用户名重复时抛错；perms 为空表示沿用角色默认 */
+  addAdmin(input: { username: string; password: string; role: Role; perms?: string[] }): Promise<Admin>;
+  /** 修改账号角色；不存在返回 false */
+  setAdminRole(id: string, role: Role): Promise<boolean>;
+  /** 设置账号的逐用户权限覆盖；传 null 表示清除覆盖、回退角色默认；不存在返回 false */
+  setAdminPerms(id: string, perms: string[] | null): Promise<boolean>;
   /** 删除账号（用于移除员工账号）；不存在返回 false */
   removeAdmin(id: string): Promise<boolean>;
   addLead(input: Omit<Lead, "id" | "at" | "status">): Promise<Lead>;
@@ -112,7 +154,17 @@ export interface Repo {
   addSearchLog(q: string, ip: string): Promise<void>;
   getContents(type?: ContentType): Promise<ContentItem[]>;
   getContent(id: string): Promise<ContentItem | null>;
+  /**
+   * 保存（upsert）若干条目。
+   * ⚠️ 只写入传入的条目，绝不删除其他数据 —— 单行写入（发布快照、订单、
+   * 支付配置、公众号绑定等）非常频繁，若顺带清空整表会造成灾难性数据丢失。
+   * 需要「整体替换」（如后台删除条目）时用 replaceContents。
+   */
   saveContents(items: ContentItem[]): Promise<ContentItem[]>;
+  /** 整体替换：写入传入条目，并删除不在列表中的其他条目（仅后台全量保存时使用） */
+  replaceContents(items: ContentItem[]): Promise<ContentItem[]>;
+  /** 按 id 精确删除若干条目（后台删除操作的正确做法） */
+  deleteContents(ids: string[]): Promise<void>;
   getAuditLogs(): Promise<AuditLog[]>;
   appendAudit(input: AuditInput): Promise<void>;
   newId(prefix: string): string;

@@ -1,12 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { SiteInfo } from "@/lib/store";
 import { brandName } from "@/lib/brand";
 
 export default function Footer({ site }: { site: SiteInfo }) {
+  const pathname = usePathname();
+  // 全屏体验页不渲染页脚：iframe 应该独占视口，避免双重滚动
+  if (pathname?.startsWith("/works/")) return null;
+
   return (
     <footer className="border-t border-white/10 bg-[#06080f]/60">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4">
-        <div>
+      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-5 gap-y-8 px-4 py-10 sm:px-6 md:grid-cols-4 md:gap-8 md:py-12">
+        <div className="col-span-2 md:col-span-1">
           <div className="flex items-center gap-2 font-semibold">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-violet text-white">
               AI
@@ -20,7 +27,7 @@ export default function Footer({ site }: { site: SiteInfo }) {
           <ul className="mt-3 space-y-2 text-sm text-slate-400">
             <li><Link href="/products" className="hover:text-white">产品与方案</Link></li>
             <li><Link href="/explore" className="hover:text-white">智能获客</Link></li>
-            <li><Link href="/products/p3" className="hover:text-white">获客中台</Link></li>
+            <li><Link href="/schedule" className="hover:text-white">智能排课</Link></li>
           </ul>
         </div>
         <div>
@@ -42,7 +49,17 @@ export default function Footer({ site }: { site: SiteInfo }) {
         </div>
       </div>
       <div className="border-t border-white/10 py-5 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} {brandName(site.companyName)} 版权所有 · {site.icp} · 仅作演示用途
+        © {new Date().getFullYear()} {brandName(site.companyName)} 版权所有 ·{" "}
+        {site.icp ? (
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="hover:text-slate-300"
+          >
+            {site.icp}
+          </a>
+        ) : null}
       </div>
     </footer>
   );

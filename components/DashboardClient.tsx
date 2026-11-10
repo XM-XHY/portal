@@ -136,7 +136,7 @@ export default function DashboardClient() {
     ? [
         { label: "累计搜索", value: String(data.kpi.totalSearches), sub: `今日 +${data.kpi.todaySearches}`, color: "text-brand-cyan" },
         { label: "累计线索", value: String(data.kpi.totalLeads), sub: `今日 +${data.kpi.todayLeads}`, color: "text-brand-violet" },
-        { label: "搜索→线索转化率", value: fmtPct(data.kpi.conversionRate), sub: "线索数 ÷ 搜索次数", color: "text-emerald-400" },
+        { label: "搜索→线索转化率", value: fmtPct(data.kpi.conversionRate), sub: `归因线索 ${data.kpi.convertedLeads} ÷ 搜索 ${data.kpi.totalSearches}`, color: "text-emerald-400" },
         { label: "线索跟进率", value: fmtPct(data.kpi.contactedRate), sub: `已跟进 ${data.statusDist.contacted} / 共 ${data.kpi.totalLeads}`, color: "text-amber-400" },
       ]
     : [];
@@ -239,7 +239,7 @@ export default function DashboardClient() {
                 })}
               </div>
               <p className="mt-5 rounded-lg border border-white/10 bg-white/5 p-3 text-xs leading-relaxed text-slate-400">
-                💡 洞察提示：热词反映市场需求，转化率反映获客质量。可在「智能获客」工作台针对高频词优化投放关键词。
+                💡 洞察提示：热词反映市场需求，转化率反映获客质量。转化口径为「留资前 30 分钟内出现过同关键词搜索（无关键词则为任意搜索）的线索 ÷ 全量搜索次数」；搜索日志已按全量统计，不再截断最近 500 条。
               </p>
             </section>
 

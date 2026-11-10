@@ -3,12 +3,16 @@ import { getPaymentProvider } from "@/lib/payment";
 import { newOrder, saveOrder, getOrder, expireOrder, type OrderProvider } from "@/lib/orders";
 import { getPayConfig } from "@/lib/payconfig";
 import { getContents } from "@/lib/store";
+import { signGrant } from "@/lib/pay-grant";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-/** 解析商品名称（排课系统等内置工具 + 产品中心条目） */
+/** 解析商品名称（排课/分班等内置工具 + 产品中心条目） */
 async function resolveTitle(productId: string): Promise<string> {
   if (productId === "sched") return "智能排课系统";
+  if (productId === "balance") return "均衡分班系统";
   try {
     const list = await getContents("product");
     const it = list.find((x) => x.id === productId);
@@ -26,6 +30,15 @@ function notifyBase(req: NextRequest): string {
 
 /** 创建支付订单（公开，无需登录；匿名下单） */
 export async function POST(req: NextRequest) {
+  // 防刷：同一 IP 每分钟最多 8 单（共享存储限流，多实例同时生效）
+  const rl = await rateLimit(`payorder:${clientIp(req)}`, 8, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `下单过于频繁，请 ${rl.retryAfter} 秒后再试` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const productId: string = body.productId;
   const client: string = body.client || "";
@@ -33,9 +46,12 @@ export async function POST(req: NextRequest) {
 
   const cfg = await getPayConfig();
   const item = cfg.items?.[productId];
-  // 未开启付费或金额<=0 → 免费放行
+  // 未开启付费或金额<=0 → 免费放行（同样签发票据，供下载接口统一校验）
   if (!item || !item.paid || item.amount <= 0) {
-    return NextResponse.json({ free: true });
+    return NextResponse.json({
+      free: true,
+      grant: signGrant({ pid: productId, oid: "free", mode: "free" }),
+    });
   }
 
   const provider = getPaymentProvider();
@@ -83,12 +99,17 @@ export async function GET(req: NextRequest) {
   await expireOrder(id);
   const order = await getOrder(id);
   if (!order) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+  const paid = order.status === "paid";
   return NextResponse.json({
     orderId: order.id,
     status: order.status,
-    paid: order.status === "paid",
+    paid,
     amount: order.amount,
     productId: order.productId,
     expiresAt: order.expiresAt,
+    // 已支付才签发票据：前端拿到后用于请求受保护的产品资料/分享导出接口
+    grant: paid
+      ? signGrant({ pid: order.productId, oid: order.id, mode: "paid" })
+      : undefined,
   });
 }

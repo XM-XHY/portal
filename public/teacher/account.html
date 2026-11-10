@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>账号与订阅 · 教师工作台</title>
+<link rel="stylesheet" href="sub/ent.css" />
+<script src="sub/config.js"></script>
+</head>
+<body class="ent-page">
+<div class="ent-head"><div class="ent-wrap">
+  <div><h1>教师工作台 · 账号与订阅</h1><p>注册享 7 天免费试用 · 20 元 / 月 · 可开通自动续费、随时关闭</p></div>
+  <a href="index.html">← 返回工作台</a>
+</div></div>
+
+<div class="ent-wrap">
+  <div id="msg" class="ent-msg"></div>
+
+  <!-- 未登录：注册 / 登录 -->
+  <div id="authPanel" class="ent-card">
+    <h2>欢迎使用教师工作台</h2>
+    <div class="desc">新用户注册后立即获得 7 天免费试用；试用到期后微信扫码支付 20 元/月即可继续使用。</div>
+    <div class="ent-tabs">
+      <div class="ent-tab active" data-tab="login">登录</div>
+      <div class="ent-tab" data-tab="register">注册并试用</div>
+    </div>
+    <form id="authForm" autocomplete="off">
+      <div class="ent-field"><label>账号（邮箱 / 手机号 / 字母数字，3~64 位）</label><input class="ent-input" id="f_account" required /></div>
+      <div class="ent-field ent-hidden" id="f_nick_wrap"><label>昵称（可选）</label><input class="ent-input" id="f_nick" maxlength="32" /></div>
+      <div class="ent-field"><label>密码（8~128 位，需同时含字母与数字）</label><input class="ent-input" id="f_pwd" type="password" required minlength="8" maxlength="128" /></div>
+      <button class="ent-btn" type="submit" id="authSubmit">登录</button>
+    </form>
+    <div class="ent-foot">注册账号会同步关联到企业网站（www.cnxhy.top）的 teacher 账号体系；账号、注册时间、试用与付费记录、权限状态保存在腾讯云数据库，业务数据按账号同步到云端，本机仅保留缓存。本应用需联网使用，不提供离线模式。</div>
+  </div>
+
+  <!-- 已登录：状态 / 支付 / 续费 / 订单 -->
+  <div id="userPanel" class="ent-hidden">
+    <div class="ent-card">
+      <h2>我的账号与权限 <span id="statusTag" class="ent-tag"></span></h2>
+      <div class="desc">以下信息来自腾讯云数据库，实时决定工作台是否可用。</div>
+      <div class="ent-grid" id="kvGrid"></div>
+      <div class="ent-row" style="margin-top:16px">
+        <button class="ent-btn green" id="btnBack">返回工作台</button>
+        <button class="ent-btn ghost" id="btnRefresh">刷新状态</button>
+        <button class="ent-btn ghost" id="btnLogout">退出登录</button>
+      </div>
+    </div>
+
+    <div class="ent-card">
+      <h2>微信扫码支付 · 20 元 / 月</h2>
+      <div class="desc">支付成功后系统自动按月开通或延续使用权限；已有剩余天数不会被覆盖，会顺延叠加。</div>
+      <div class="ent-row">
+        <button class="ent-btn" id="btnPay">生成付款二维码</button>
+        <span id="payHint" class="ent-badge ent-hidden"></span>
+      </div>
+      <div id="qrBox" class="ent-qr ent-hidden">
+        <img id="qrImg" alt="微信支付二维码" />
+        <div id="qrFallback" class="code"></div>
+        <div class="code" id="qrInfo"></div>
+        <div class="ent-row" style="justify-content:center">
+          <button class="ent-btn ghost sm" id="btnCopy">复制支付链接</button>
+          <button class="ent-btn amber sm ent-hidden" id="btnMockPay">模拟扫码支付成功（沙箱）</button>
+          <button class="ent-btn ghost sm" id="btnCheckPay">我已支付，刷新状态</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ent-card">
+      <h2>自动续费（20 元 / 月）</h2>
+      <div class="desc" id="renewDesc">开通后，系统将在到期前按 20 元/月自动扣款并顺延使用期限；需先在微信中完成签约授权，且可随时在此关闭。</div>
+      <div class="ent-row">
+        <button class="ent-btn purple" id="btnEntrust">开通自动续费</button>
+        <button class="ent-btn amber ent-hidden" id="btnMockSign">模拟确认签约（沙箱）</button>
+        <button class="ent-btn red ent-hidden" id="btnCancelRenew">关闭自动续费</button>
+      </div>
+      <div class="ent-foot">自动续费依据微信「委托代扣」产品实现，需商户单独申请权限并由用户主动签约；未开通时可在到期前手动扫码续费。关闭后不再扣款，已开通的期限不受影响。</div>
+    </div>
+
+    <div class="ent-card">
+      <h2>订单记录</h2>
+      <div class="ent-scroll"><table class="ent-table"><thead><tr>
+        <th>订单号</th><th>类型</th><th>金额</th><th>状态</th><th>创建时间</th><th>支付时间</th>
+      </tr></thead><tbody id="orderRows"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="ent-foot">
+    订阅服务说明：价格 20 元/月；免费试用 7 天；到期未支付将暂停工作台访问，本机数据不会删除。
+    自动续费须经用户明确授权，可在此页随时关闭；关闭后当期已付费期限继续有效。
+  </div>
+</div>
+<script src="sub/account.js"></script>
+</body>
+</html>

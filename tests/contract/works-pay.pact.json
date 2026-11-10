@@ -1,0 +1,118 @@
+{
+  "consumer": "works-center-frontend",
+  "provider": "xx-tech-portal",
+  "generatedBy": "integration-interface-reviewer (柯砚) — P1 契约资产补全",
+  "schemaVersion": "1.0",
+  "description": "消费者驱动契约：作品中心会员（全科提分导师）与主站支付/会员接口之间的请求/响应形状约定。任何一端偏离下列 shape 都应导致 tests/contract/verify.mjs 失败（process.exit(1)），作为 CI 中的破坏性变更护栏。",
+  "providerInterfaces": {
+    "PaymentProvider": {
+      "source": "lib/payment.ts",
+      "methods": {
+        "createNativePayment(order, notifyBase)": {
+          "returns": { "codeUrl": "string" }
+        },
+        "verifyCallback(rawBody, headers)": {
+          "returns": { "outTradeNo": "string", "tradeNo": "string", "paid": "boolean", "amountFen": "number" }
+        }
+      }
+    },
+    "Order": {
+      "source": "lib/orders.ts",
+      "requiredFields": ["id", "productId", "productTitle", "amount", "amountFen", "provider", "status", "createdAt", "expiresAt"]
+    }
+  },
+  "interactions": [
+    {
+      "id": "wechat-native-create",
+      "providerState": "微信支付 Native 下单",
+      "request": {
+        "method": "POST",
+        "path": "/v3/pay/transactions/native",
+        "bodyShape": {
+          "appid": "string",
+          "mchid": "string",
+          "description": "string",
+          "out_trade_no": "string",
+          "notify_url": "string",
+          "amount": { "total": "number", "currency": "string" },
+          "time_expire": "string"
+        }
+      },
+      "response": {
+        "status": 200,
+        "bodyShape": { "code_url": "string" }
+      }
+    },
+    {
+      "id": "payment-callback-verify",
+      "providerState": "支付网关异步回调验签解密后",
+      "description": "verifyCallback 返回的字段是 mock-notify、/api/pay/callback/* 等回调处理方唯一可依赖的形状（SEC-05 依赖 outTradeNo + amountFen 做一致性校验）。",
+      "response": {
+        "returns": { "outTradeNo": "string", "tradeNo": "string", "paid": "boolean", "amountFen": "number" }
+      }
+    },
+    {
+      "id": "work-member-create",
+      "providerState": "已登录作品账号 + 套餐存在 + 支付通道可用",
+      "endpoint": { "method": "POST", "path": "/api/works/pay/create" },
+      "requestShape": { "plan": "string", "client": "string", "reqId": "string(optional,idempotency)" },
+      "response": {
+        "status": 200,
+        "bodyShape": {
+          "orderId": "string",
+          "codeUrl": "string",
+          "expiresAt": "string",
+          "amount": "number",
+          "plan": "string",
+          "days": "number",
+          "planName": "string"
+        },
+        "idempotentBodyShape": {
+          "orderId": "string",
+          "codeUrl": "string|null",
+          "expiresAt": "string",
+          "amount": "number",
+          "plan": "string",
+          "days": "number",
+          "planName": "string",
+          "idempotent": "boolean(true)"
+        }
+      }
+    },
+    {
+      "id": "work-member-claim",
+      "providerState": "订单已支付(paid)且绑定购买账号",
+      "endpoint": { "method": "POST", "path": "/api/works/pay/claim" },
+      "requestShape": { "orderId": "string" },
+      "response": {
+        "status": 200,
+        "bodyShape": { "paid": "boolean(true)", "plan": "string", "days": "number", "planName": "string" }
+      },
+      "errorResponses": [
+        { "status": 401, "when": "未登录", "bodyShape": { "error": "string" } },
+        { "status": 404, "when": "订单不存在", "bodyShape": { "error": "string" } },
+        { "status": 400, "when": "订单未支付 / 非会员订单", "bodyShape": { "error": "string" } },
+        { "status": 403, "when": "SEC-04 跨账号领取被拒(o.work.userId !== uid)", "bodyShape": { "error": "string" } }
+      ]
+    },
+    {
+      "id": "work-member-status",
+      "providerState": "按订单号查询会员状态",
+      "endpoint": { "method": "GET", "path": "/api/works/pay/status?id={orderId}" },
+      "response": {
+        "status": 200,
+        "bodyShape": {
+          "paid": "boolean",
+          "orderPaid": "boolean",
+          "granted": "boolean",
+          "plan": "string|null",
+          "days": "number|null",
+          "planName": "string",
+          "expiresAt": "string",
+          "amount": "number",
+          "status": "string"
+        }
+      }
+    }
+  ]
+}

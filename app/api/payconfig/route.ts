@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const me = await getAdminFromCookie();
   if (!me) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(me.role, "settings.manage"))
+  if (!can(me, "settings.manage"))
     return NextResponse.json({ error: "无权限" }, { status: 403 });
 
   const body = await req.json().catch(() => null);

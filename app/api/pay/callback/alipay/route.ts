@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
   const raw = await req.text();
   try {
     const r = await provider.verifyCallback(raw, {});
-    if (r.paid) await markOrderPaid(r.outTradeNo, r.tradeNo);
+    if (r.paid) {
+      const ok = await markOrderPaid(r.outTradeNo, r.tradeNo, r.amountFen);
+      if (!ok) return new NextResponse("failure", { status: 500, headers: { "Content-Type": "text/plain" } });
+    }
     const resp = provider.successResponse();
     return new NextResponse(resp.body, { status: 200, headers: { "Content-Type": resp.contentType } });
   } catch (e: any) {

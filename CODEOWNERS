@@ -1,0 +1,28 @@
+# CODEOWNERS —— 代码评审自动指派（GitHub 自动生效）
+#
+# 请将下方占位团队/用户替换为项目真实的 GitHub 团队或成员 handle。
+# 语法：<路径模式>   <@组织/团队或@用户>
+
+# 默认兜底：所有文件
+*       @xm-tech-portal/owners
+
+# CI / QA 流程资产：由流程·度量域负责
+.github/                 @xm-tech-portal/qa
+docs/                    @xm-tech-portal/qa
+TESTING.md               @xm-tech-portal/qa
+SECURITY.md              @xm-tech-portal/qa
+RELEASE-GATE.md          @xm-tech-portal/qa
+.eslintrc.json           @xm-tech-portal/qa
+
+# 后端 / 数据 / 支付 / 鉴权
+lib/                     @xm-tech-portal/backend
+app/api/                 @xm-tech-portal/backend
+
+# 前端页面与组件
+app/                     @xm-tech-portal/frontend
+components/              @xm-tech-portal/frontend
+
+# 部署与配置
+next.config.mjs          @xm-tech-portal/backend
+vercel.json              @xm-tech-portal/ops
+Dockerfile               @xm-tech-portal/ops

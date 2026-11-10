@@ -3,15 +3,22 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContent, getContents } from "@/lib/store";
 import { getProductDocs, docsOfProduct, docIcon, KIND_LABEL } from "@/lib/products";
+import { pageMeta } from "@/lib/seo";
 import LeadForm from "@/components/LeadForm";
 import OpenChatButton from "@/components/OpenChatButton";
+import { DocViewButton, DocDownloadButton } from "@/components/DocActions";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const item = await getContent(params.id);
   if (!item) return { title: "产品详情" };
-  return { title: item.title, description: item.summary };
+  return pageMeta({
+    title: item.title,
+    description: item.summary,
+    path: `/products/${item.id}`,
+    keywords: item.tags?.length ? item.tags : undefined,
+  });
 }
 
 export default async function ProductDetail({ params }: { params: { id: string } }) {
@@ -109,20 +116,8 @@ export default async function ProductDetail({ params }: { params: { id: string }
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={`/api/products/doc/${d.id}?mode=view`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10"
-                      >
-                        在线阅读
-                      </a>
-                      <a
-                        href={`/api/products/doc/${d.id}`}
-                        className="rounded-lg border border-brand-cyan/40 px-3 py-1.5 text-xs text-brand-cyan transition hover:bg-brand-cyan/10"
-                      >
-                        下载文本版
-                      </a>
+                      <DocViewButton docId={d.id} productId={item.id} />
+                      <DocDownloadButton docId={d.id} productId={item.id} />
                     </div>
                   </li>
                 ))}

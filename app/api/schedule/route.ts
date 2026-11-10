@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "schedule.manage"))
+  if (!can(admin, "schedule.manage"))
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   return NextResponse.json(await getScheduleState(), { headers: { "Cache-Control": "no-store" } });
 }
@@ -24,7 +24,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "schedule.manage"))
+  if (!can(admin, "schedule.manage"))
     return NextResponse.json({ error: "无权限" }, { status: 403 });
 
   const body = (await req.json().catch(() => ({}))) as Partial<SchedState>;

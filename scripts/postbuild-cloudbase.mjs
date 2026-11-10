@@ -51,6 +51,17 @@ async function main() {
     console.warn("[postbuild] ! 跳过：未找到 public（本项目可能无需公共静态文件）");
   }
 
+  // 3) 作品文件：assets -> .next/standalone/assets
+  // /api/works/[id] 在运行时用 fs 读取 assets/works/*.html，
+  // standalone 只打包 JS 依赖、不会带任意资源目录，不复制就会运行期 503。
+  const srcAssets = path.join(root, "assets");
+  if (await has(srcAssets)) {
+    await cp(srcAssets, path.join(standalone, "assets"), { recursive: true });
+    console.log("[postbuild] ✓ 已复制 assets");
+  } else {
+    console.warn("[postbuild] ! 跳过：未找到 assets");
+  }
+
   const serverJs = path.join(standalone, "server.js");
   if (!existsSync(serverJs)) {
     console.error("[postbuild] 未找到 .next/standalone/server.js，产物不完整");

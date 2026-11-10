@@ -14,7 +14,16 @@ export async function POST(req: NextRequest) {
   const headers = Object.fromEntries(req.headers.entries());
   try {
     const r = await provider.verifyCallback(raw, headers);
-    if (r.paid) await markOrderPaid(r.outTradeNo, r.tradeNo);
+    if (r.paid) {
+      const ok = await markOrderPaid(r.outTradeNo, r.tradeNo, r.amountFen);
+      if (!ok) {
+        // 金额不符 / 订单不存在 / 已过期：返回 FAIL 让微信重试并留下可排查的响应
+        return NextResponse.json(
+          { code: "FAIL", message: "订单金额校验失败或订单不存在" },
+          { status: 500 }
+        );
+      }
+    }
     const resp = provider.successResponse();
     return new NextResponse(resp.body, { status: 200, headers: { "Content-Type": resp.contentType } });
   } catch (e: any) {

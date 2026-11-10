@@ -2,10 +2,19 @@ node_modules
 .next
 .git
 .gitignore
+# 测试资产与覆盖率报告不参与运行时，打进镜像只会增大体积
+tests
+coverage
+vitest.config.ts
+lighthouserc.json
+.semgrep-local.yml
 data
 *.log
 .vercel
 .workbuddy
+# 密钥只从云端环境变量注入，不随构建上下文进入镜像层
+.env*
+.env**
 README.md
 DEPLOY.md
 DEPLOY-CLOUDBASE.md

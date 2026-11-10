@@ -10,32 +10,22 @@ import {
 } from "@/lib/chat";
 import { searchKnowledge, formatHits } from "@/lib/kb";
 import { llmChat } from "@/lib/llm";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-
-/** 简单限流：同一 IP 5 秒至多 1 次 */
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const last = (globalThis as any).__lastChat?.[ip] || 0;
-  if (now - last < 5000) return true;
-  (globalThis as any).__lastChat = { ...((globalThis as any).__lastChat || {}), [ip]: now };
-  return false;
-}
 
 /**
  * 大模型回复已统一到 lib/llm.ts（国产模型优先，OpenAI 兼容协议）。
  * 未配置密钥或调用失败时返回 null，下面会依次降级到知识库直答、规则引擎。
  */
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "local";
-
-  if (rateLimited(ip)) {
+  const ip = clientIp(req);
+  const rl = await rateLimit(`chat:${ip}`, 1, 5000);
+  if (!rl.ok) {
     return NextResponse.json(
-      { error: "发送太频繁，请稍等几秒再试" },
-      { status: 429 }
+      { error: `发送太频繁，请 ${rl.retryAfter} 秒后再试` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
     );
   }
 

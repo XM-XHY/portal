@@ -32,13 +32,14 @@ export async function parseDocument(
   }
 
   if (ext === "xlsx" || ext === "xls" || ext === "csv") {
-    const XLSX = await import("xlsx");
-    // codepage 65001 = UTF-8：CSV 无 BOM 时 SheetJS 默认按 Latin-1 解码会乱码
-    const wb = XLSX.read(buf, { type: "buffer", codepage: 65001 });
+    // 表格解析统一走 lib/sheet（exceljs），替换存在 high 漏洞且无补丁的 xlsx@0.18.5。
+    // lib/sheet 内部按 UTF-8 解码 CSV（无需再指定 codepage），旧版 .xls 会抛明确错误。
+    const { readSheetTexts } = await import("./sheet");
+    const sheets = await readSheetTexts(buf);
     const parts: string[] = [];
-    for (const name of wb.SheetNames) {
-      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]);
-      if (csv.trim()) parts.push(`# 工作表：${name}\n${csv.trim()}`);
+    for (const s of sheets) {
+      const csv = s.text.trim();
+      if (csv) parts.push(`# 工作表：${s.name}\n${csv}`);
     }
     return { text: normalize(parts.join("\n\n")), ext };
   }

@@ -35,11 +35,26 @@ export default async function HomePage() {
           <Link href="/products" className="btn-ghost">进入产品中心 →</Link>
         </div>
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {products.slice(0, 3).map((p) => (
+          {products.slice(0, 4).map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
+        </div>
+      </section>
 
-          {/* 排课系统：免费使用 · 下载付费 */}
+      {/* 实用工具：免费使用 · 下载付费 */}
+      <section id="tools" className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold sm:text-4xl">
+              开箱即用的 <span className="text-gradient">教务工具</span>
+            </h2>
+            <p className="mt-3 max-w-2xl text-slate-400">
+              免注册直接使用，数据在浏览器本地处理，仅在导出结果时收取少量费用。
+            </p>
+          </div>
+        </div>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2">
+          {/* 排课系统 */}
           <Link
             href="/schedule"
             className="glass glass-hover group flex flex-col p-6"
@@ -52,10 +67,30 @@ export default async function HomePage() {
             </div>
             <h3 className="mt-3 text-lg font-semibold text-white">智能排课系统</h3>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">
-              导入名册与旧课表，一键自动排课、三视图校核、拖拽微调。导出课表需支付少量费用。
+              导入教师、班级与科目课时，一键自动排课，支持教师课时上限与冲突校验、三视图校核、拖拽微调。导出课表需支付少量费用。
             </p>
             <div className="mt-4 text-sm font-medium text-brand-blue transition group-hover:translate-x-1">
               免费开始排课 →
+            </div>
+          </Link>
+
+          {/* 均衡分班系统 */}
+          <Link
+            href="/balance"
+            className="glass glass-hover group flex flex-col p-6"
+          >
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/5 text-2xl transition group-hover:scale-110">
+              ⚖️
+            </div>
+            <div className="mt-4 inline-flex w-fit rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs text-emerald-300">
+              免费使用 · 下载付费
+            </div>
+            <h3 className="mt-3 text-lg font-semibold text-white">均衡分班系统</h3>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">
+              导入学生名册，按成绩、男女、村居（同村可选同班或打散）、双胞胎捆绑一键均衡分班，分班后可发布家长扫码查询。导出名单需支付少量费用。
+            </p>
+            <div className="mt-4 text-sm font-medium text-brand-blue transition group-hover:translate-x-1">
+              免费开始分班 →
             </div>
           </Link>
         </div>

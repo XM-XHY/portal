@@ -7,14 +7,17 @@ import {
 } from "@/lib/products";
 import ProductCenter from "@/components/ProductCenter";
 import LeadForm from "@/components/LeadForm";
+import { pageMeta } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "产品中心",
   description:
-    "产品中心：标准化 AI 产品与成熟解决方案，提供产品资料与方案文档下载，可按业务场景选择并预约演示。",
-};
+    "标准化 AI 产品与成熟解决方案：智能客服 Copilot、企业知识中枢、智能获客中台、AI 中台整体方案与私有化部署，提供产品资料下载与演示预约。",
+  path: "/products",
+  keywords: ["AI 产品", "AI 解决方案", "智能客服系统", "企业知识库系统"],
+});
 
 export default async function ProductsPage() {
   const [items, docs] = await Promise.all([getProductItems(), getProductDocs()]);

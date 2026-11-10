@@ -1,0 +1,88 @@
+name: CI
+
+# 触发条件：向 master 推送，或对任意分支开 PR 到 master。
+# 任何一步失败即阻断（GitHub Actions 默认 fail-fast，任意 step 非零退出即红灯）。
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# 防止并发流水线互相覆盖
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: Quality Gate (typecheck / lint / unit+integration / smoke / regression / contract)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # ---- 类型检查 ----
+      # tests/ 与 vitest.config.ts 在 tsconfig 中排除：前者含需各自运行时（vitest/node）校验的
+      # 非 TS 骨架文件，后者的 cache 键非 Vite 官方类型，纳入会污染发布代码的类型门禁。
+      - name: Type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      # ---- Lint ----
+      # 独立运行，不依赖 `next build`（next.config.mjs 的 ignoreDuringBuilds 只影响构建期）。
+      # eslint / eslint-config-next 已在 devDependencies 中，无需临时安装。
+      - name: Lint (eslint)
+        run: npx eslint . --ext .ts,.tsx
+
+      # ---- 单元 + 集成测试（含覆盖率阈值）----
+      # 阈值在 vitest.config.ts 的 test.coverage.thresholds 中定义，
+      # 低于阈值 vitest 以非零码退出 → 本步阻断。
+      - name: Unit & integration tests (vitest + coverage thresholds)
+        run: npx vitest run --coverage
+
+      # ---- 测试保障层：冒烟 / 版本化回归 / 契约 ----
+      # 这三个脚本以退出码表达结论：任一断言失败即非 0，直接阻断流水线。
+      - name: Smoke (exit-code gated)
+        run: node tests/smoke/run.mjs
+
+      - name: Regression suite (exit-code gated)
+        run: node tests/regression/run.mjs
+
+      - name: Contract verification (exit-code gated)
+        run: node tests/contract/verify.mjs
+
+      # ---- 组件级性能基线（防止明显性能回退）----
+      # 纯计算基准，不联网。
+      - name: Performance baseline (component bench)
+        run: node --experimental-strip-types tests/perf/component-bench.mjs
+
+      # ---- 上线前自检 ----
+      # 密钥只从 CI Secret 注入，不落地到版本库；仅在 push 到 master 时强制（fork PR 拿不到 Secret）。
+      - name: Preflight check
+        if: github.event_name == 'push'
+        env:
+          ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
+          PAY_GRANT_SECRET: ${{ secrets.PAY_GRANT_SECRET }}
+          WORK_SESSION_SECRET: ${{ secrets.WORK_SESSION_SECRET }}
+          ADMIN_PASSWORD_SALT: ${{ secrets.ADMIN_PASSWORD_SALT }}
+        run: |
+          umask 077
+          {
+            echo "ADMIN_SESSION_SECRET=$ADMIN_SESSION_SECRET"
+            echo "PAY_GRANT_SECRET=$PAY_GRANT_SECRET"
+            echo "WORK_SESSION_SECRET=$WORK_SESSION_SECRET"
+            echo "ADMIN_PASSWORD_SALT=$ADMIN_PASSWORD_SALT"
+          } > .env.secrets.local
+          node scripts/preflight-check.mjs --prod
+          # .env.secrets.local 被 .gitignore 的 `.env*.local` 覆盖，不会进入版本库

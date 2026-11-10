@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLeads, addLead, updateLead, appendAudit } from "@/lib/store";
 import { getAdminFromCookie, clientIp } from "@/lib/session";
 import { can } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,18 @@ const PAGE_SIZE = 10;
 // 访客提交线索（公开，无需登录）
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  // 探索页搜索通道降级为示例数据时，前端会禁用留资并带上 demo 标记，
+  // 服务端也拒绝这类提交，避免把「假检索结果」当成真实商机入库
+  if (body.demo) {
+    return NextResponse.json({ error: "当前为演示示例数据，暂不可提交线索，请稍后再试" }, { status: 400 });
+  }
+  const rl = await rateLimit(`lead:${clientIp(req)}`, 5, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `提交过于频繁，请 ${rl.retryAfter} 秒后再试` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
   const name = String(body.name || "").trim();
   const phone = String(body.phone || "").trim();
   const company = String(body.company || "").trim();
@@ -28,7 +41,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "leads.view")) {
+  if (!can(admin, "leads.view")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
 
@@ -56,7 +69,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "leads.view")) {
+  if (!can(admin, "leads.view")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
   const { id, status, note } = await req.json().catch(() => ({}));

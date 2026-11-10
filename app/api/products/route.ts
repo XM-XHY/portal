@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getContents,
   saveContents,
+  deleteContents,
   newId,
   appendAudit,
   type ContentItem,
@@ -80,7 +81,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "content.manage")) {
+  if (!can(admin, "content.manage")) {
     return NextResponse.json({ error: "无权限，需要内容管理权限" }, { status: 403 });
   }
 
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "content.manage")) {
+  if (!can(admin, "content.manage")) {
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
 
@@ -149,7 +150,9 @@ export async function DELETE(req: NextRequest) {
   const next = list.filter(
     (x) => x.id !== id && !(x.type === PDOC && x.client === id) && !linkedKbIds.includes(x.id)
   );
-  await saveContents(next);
+  // 差集删除：只删本次真正被移除的 id，绝不动其他数据
+  const keep = new Set(next.map((x) => x.id));
+  await deleteContents(list.filter((x) => !keep.has(x.id)).map((x) => x.id));
 
   await appendAudit({
     actor: admin.username,

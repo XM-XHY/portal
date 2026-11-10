@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSite } from "@/lib/store";
 import { brandName } from "@/lib/brand";
+import { pageMeta } from "@/lib/seo";
 import Stats from "@/components/Stats";
 import LeadForm from "@/components/LeadForm";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "关于我们",
-  description: "XX 科技 — 用 AI 重塑企业增长。我们致力于把人工智能落到业务实处，让每一家企业都能用上可信、可用的智能。",
-};
+  description:
+    "用 AI 重塑企业增长。我们专注于企业级大模型应用落地，把人工智能做可信、可用、可规模化，让每一家企业都能真正用上 AI。",
+  path: "/about",
+  keywords: ["公司介绍", "AI 团队", "企业愿景"],
+});
 
 const VALUES = [
   { icon: "🎯", title: "客户为先", desc: "以业务增长为标尺，不做炫技的 AI，只做能落地的 AI。" },

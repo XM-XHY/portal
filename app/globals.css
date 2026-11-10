@@ -8,6 +8,24 @@
 
 html {
   scroll-behavior: smooth;
+  /* sticky 导航高约 60px，锚点跳转时不要把它压在标题上 */
+  scroll-padding-top: 5rem;
+}
+
+/* clip 相比 hidden 不会创建新的滚动容器，position:sticky 仍然生效 */
+body {
+  overflow-x: clip;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 键盘导航必须看得见焦点；:focus-visible 不会干扰鼠标点击 */
+:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 body {
@@ -67,9 +85,66 @@ body {
   }
 }
 
-/* 移动端：为底部悬浮 CTA 让出空间，避免遮挡页脚 */
+/* 悬浮客服：位置需要同时兼顾底部 CTA 与 iPhone 安全区，放 CSS 里比内联样式好覆盖断点 */
+.chat-ball {
+  bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+.chat-panel {
+  bottom: calc(10.5rem + env(safe-area-inset-bottom));
+}
+.chat-nudge {
+  bottom: calc(10rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .chat-ball {
+    bottom: 1.5rem;
+  }
+  .chat-panel {
+    bottom: 6rem;
+  }
+  .chat-nudge {
+    bottom: 6rem;
+  }
+}
+
+/* ---------- 移动端可用性基线 ---------- */
 @media (max-width: 767px) {
+  /* iOS 上 background-attachment:fixed 会随滚动跳动并拖慢帧率 */
+  body {
+    background-attachment: scroll;
+  }
+
+  /* 输入框字号 < 16px 时 iOS Safari 会在聚焦瞬间自动放大整个页面，且不会自动缩回 */
+  input,
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+
+  /* 多层 24px 毛玻璃叠加是移动端掉帧的主要来源，降到 8px 保留质感 */
+  .glass {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* 触控目标最小 44×44（WCAG 2.5.5 / iOS HIG） */
+  .btn-primary,
+  .btn-ghost {
+    min-height: 44px;
+  }
+
+  /* 底部悬浮 CTA + iPhone Home Indicator 都要让出来 */
   footer {
-    padding-bottom: 5.5rem;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* 长 URL / 长英文词不撑破卡片 */
+  h1,
+  h2,
+  h3,
+  p,
+  li {
+    overflow-wrap: break-word;
   }
 }

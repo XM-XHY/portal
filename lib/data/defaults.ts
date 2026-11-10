@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { hash } from "./hash";
 import type { SiteInfo, Admin, ContentItem } from "./types";
 
@@ -13,12 +14,42 @@ export function defaultSite(): SiteInfo {
   };
 }
 
-// 初识管理员口令。已按用户要求统一为强口令（见 .env.example 说明）。
-// ⚠️ 站点已公网可访问，上线后请在「后台 → 账号安全」再次修改，或接入身份服务。
+/**
+ * 首次播种用的初始管理员口令。
+ *
+ * ⚠️ 源码里不再硬编码任何明文口令（仓库公开可直接看到，等于把后台口令写死）。
+ * 优先读取 INITIAL_ADMIN_PASSWORD；未配置时生成一次随机强口令并打印到启动日志，
+ * 模块级缓存保证同一进程内多次播种拿到的是同一个值（JsonRepo 会把它持久化到 db.json）。
+ *
+ * 新部署务必在部署平台配置 INITIAL_ADMIN_PASSWORD，并在首次登录后
+ * 到「后台 → 账号安全」立即修改口令；旧部署的账号已在库中，不受此改动影响，
+ * 但也需要手动轮换一次历史口令。
+ */
+let cachedInitialPassword: string | null = null;
+
+export function initialAdminPassword(): string {
+  if (cachedInitialPassword) return cachedInitialPassword;
+  const fromEnv = (process.env.INITIAL_ADMIN_PASSWORD || "").trim();
+  cachedInitialPassword = fromEnv || `XHY-${crypto.randomBytes(12).toString("base64url")}`;
+  if (!fromEnv) {
+    console.warn(
+      `[defaults] 未配置 INITIAL_ADMIN_PASSWORD，本次初始管理员口令为随机值：${cachedInitialPassword}\n` +
+        "请妥善保存并尽快在「后台 → 账号安全」修改；后续部署请显式配置该环境变量。"
+    );
+  }
+  return cachedInitialPassword;
+}
+
+/** 判断某个口令哈希是否仍是初始口令（用于后台提示「请立即修改」） */
+export function isInitialPasswordHash(pwHash: string): boolean {
+  return pwHash === hash(initialAdminPassword());
+}
+
 export function defaultAdmins(): Admin[] {
+  const pwHash = hash(initialAdminPassword());
   return [
-    { id: "a1", username: "admin", role: "super", pwHash: hash("#XHY-@350211") },
-    { id: "a2", username: "market", role: "lead", pwHash: hash("#XHY-@350211") },
+    { id: "a1", username: "admin", role: "super", pwHash },
+    { id: "a2", username: "market", role: "lead", pwHash },
   ];
 }
 

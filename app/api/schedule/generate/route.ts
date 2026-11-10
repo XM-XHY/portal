@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromCookie();
   if (!admin) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!can(admin.role, "schedule.manage"))
+  if (!can(admin, "schedule.manage"))
     return NextResponse.json({ error: "无权限" }, { status: 403 });
 
   const state = await getScheduleState();

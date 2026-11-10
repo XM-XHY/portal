@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "generatedBy": "test-assurance (闻朔)",
+  "description": "版本化回归套件映射：用例 ⇄ 影响面 tag(p0/p1/p2) ⇄ 变更路径。CI 可按变更影响面选择子集（如仅改 lib/orders.ts 时跑 p0-pay）。",
+  "tags": {
+    "p0": "核心付费 / 资损链路，任何改动都须全量执行",
+    "p1": "后台鉴权与初始凭据，涉及安全边界",
+    "p2": "站点默认内容与关键常量，结构性回归"
+  },
+  "suites": [
+    {
+      "id": "p0-pay",
+      "tag": "p0",
+      "file": "tests/regression/p0-pay/pay.test.mjs",
+      "changePaths": [
+        "lib/payment.ts",
+        "lib/pay-access.ts",
+        "lib/orders.ts",
+        "lib/work-db.ts",
+        "lib/data/defaults.ts",
+        "app/api/works/pay/[action]/route.ts"
+      ],
+      "cases": [
+        { "id": "P0-1", "desc": "付费墙 fail-closed：配置缺失时一律 402，绝不默认放行", "changePaths": ["lib/pay-access.ts", "lib/payconfig.ts"] },
+        { "id": "P0-2", "desc": "免费商品可放行（互补分支，避免误伤免费路径）", "changePaths": ["lib/pay-access.ts", "lib/payconfig.ts"] },
+        { "id": "P0-3", "desc": "markOrderPaid 实付金额不一致时拒绝置为已付", "changePaths": ["lib/orders.ts"] },
+        { "id": "P0-4", "desc": "markOrderPaid 金额缺失时拒绝置为已付", "changePaths": ["lib/orders.ts"] },
+        { "id": "P0-5", "desc": "markOrderPaid 金额为负时拒绝置为已付", "changePaths": ["lib/orders.ts"] },
+        { "id": "P0-6", "desc": "markOrderPaid 金额一致时置为已付", "changePaths": ["lib/orders.ts"] },
+        { "id": "P0-7", "desc": "SEC-04 同账号绑定：已付订单权益不可被其他账号领取", "changePaths": ["lib/work-db.ts", "app/api/works/pay/[action]/route.ts"] },
+        { "id": "P0-8", "desc": "grantEntitlement 幂等：同一订单仅发放一次权益", "changePaths": ["lib/work-db.ts"] }
+      ]
+    },
+    {
+      "id": "p1-admin",
+      "tag": "p1",
+      "file": "tests/regression/p1-admin/admin.test.mjs",
+      "changePaths": ["lib/session.ts", "lib/data/defaults.ts", "lib/data/hash.ts"],
+      "cases": [
+        { "id": "P1-1", "desc": "signSession / verifyToken 往返一致", "changePaths": ["lib/session.ts"] },
+        { "id": "P1-2", "desc": "篡改签名后 verifyToken 返回 null（防伪造会话）", "changePaths": ["lib/session.ts"] },
+        { "id": "P1-3", "desc": "非法 / 空 token 返回 null", "changePaths": ["lib/session.ts"] },
+        { "id": "P1-4", "desc": "initialAdminPassword 未配置时返回随机非空前值", "changePaths": ["lib/data/defaults.ts"] },
+        { "id": "P1-5", "desc": "initialAdminPassword 已配置时返回该配置值", "changePaths": ["lib/data/defaults.ts"] }
+      ]
+    },
+    {
+      "id": "p2-page",
+      "tag": "p2",
+      "file": "tests/regression/p2-page/page.test.mjs",
+      "changePaths": ["lib/data/defaults.ts", "lib/payconfig.ts", "lib/data/types.ts"],
+      "cases": [
+        { "id": "P2-1", "desc": "defaultContents 非空且结构完整", "changePaths": ["lib/data/defaults.ts"] },
+        { "id": "P2-2", "desc": "defaultSite 关键字段非空", "changePaths": ["lib/data/defaults.ts"] },
+        { "id": "P2-3", "desc": "关键常量存在（PAYCFG_*/SCHED_PAY_ID/BALANCE_PAY_ID/SYSTEM_CONTENT_TYPES）", "changePaths": ["lib/payconfig.ts", "lib/data/types.ts"] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>后台管理 · 教师工作台订阅</title>
+<link rel="stylesheet" href="sub/ent.css" />
+<script src="sub/config.js"></script>
+</head>
+<body class="ent-page">
+<div class="ent-head"><div class="ent-wrap">
+  <div><h1>教师工作台 · 后台管理</h1><p>仅企业网站后台可查询订阅信息并手动开通 / 停用权限</p></div>
+  <a href="index.html">← 返回工作台</a>
+</div></div>
+
+<div class="ent-wrap">
+  <div class="ent-card">
+    <h2>请从企业网站后台进入</h2>
+    <div class="desc">
+      在线订阅版已把「查询账号与订阅信息」「为指定账号手动开通使用权限并设定使用期限」「停用权限」<b>全部收敛到企业网站后台</b>，
+      本页与用户端不再提供任何管理入口，也不保留后台登录表单。
+    </div>
+    <div id="adminStatus" class="ent-msg" style="display:block;margin-bottom:14px;">正在检测企业网站后台入口…</div>
+    <div class="ent-row" style="margin-top:16px">
+      <a class="ent-btn" id="btnAdmin" href="/admin/teacher-sub">前往企业网站后台</a>
+      <a class="ent-btn ghost" href="account.html">账号与订阅</a>
+      <a class="ent-btn ghost ent-hidden" id="btnLocalAdmin" href="http://localhost:3100/admin/teacher-sub">打开本地开发后台</a>
+    </div>
+    <div id="adminHelp" class="ent-foot">
+      后台使用企业网站现有管理员会话鉴权，服务端以共享密钥调用腾讯云云函数；密钥与云函数网关地址均不下发浏览器。
+      所有手动开通 / 停用操作都会写入审计日志。
+    </div>
+  </div>
+  <div class="ent-foot">
+    账号、注册时间、试用到期、付费 / 续费状态、权限状态与使用期限保存在腾讯云数据库；本应用需联网使用，不提供离线模式。
+  </div>
+</div>
+<script>
+/* ============================================================
+ * 后台入口导航：绝不把用户盲目丢进 404
+ *  - 同域部署（www.cnxhy.top/teacher/）：用相对路径 /admin/teacher-sub
+ *  - 部署前该路由不存在（404）：先探测，阻止跳转并给出部署指引
+ *  - 本地预览：说明线上需先部署，提供本地开发后台与「仍要打开」入口
+ * 说明：本页只做跳转与状态提示，不含任何管理表单或开通能力。
+ * ============================================================ */
+(function () {
+  'use strict';
+  var C = window.ENT_CONFIG || {};
+  var btn = document.getElementById('btnAdmin');
+  var box = document.getElementById('adminStatus');
+  var help = document.getElementById('adminHelp');
+  var host = location.hostname || '';
+  var isSite = /(^|\.)cnxhy\.top$/i.test(host);
+  var isLocal = location.protocol === 'file:' || host === 'localhost' ||
+    host === '127.0.0.1' || host === '' || host === '0.0.0.0' || /^192\.168\./.test(host);
+  var SITE_PATH = '/admin/teacher-sub';
+  var localUrl = C.localAdminUrl || 'http://localhost:3100' + SITE_PATH;
+  var onlineUrl = C.adminUrl || ((C.siteBase || 'https://www.cnxhy.top') + SITE_PATH);
+  var blocked = false;
+  var localBtn = document.getElementById('btnLocalAdmin');
+
+  // 同域部署一律用相对路径，避免硬编码域名 / 端口错配
+  var target = isSite ? SITE_PATH : onlineUrl;
+  if (btn) btn.href = target;
+  if (isLocal && localBtn) {
+    localBtn.href = localUrl;
+    localBtn.classList.remove('ent-hidden');
+  }
+
+  function msg(text, kind) {
+    if (!box) return;
+    box.textContent = text;
+    box.style.color = kind === 'ok' ? '#15803d' : kind === 'warn' ? '#b45309' : '#475569';
+    box.style.background = kind === 'ok' ? '#f0fdf4' : kind === 'warn' ? '#fffbeb' : '#f8fafc';
+    box.style.border = '1px solid ' + (kind === 'ok' ? '#bbf7d0' : kind === 'warn' ? '#fde68a' : '#e2e8f0');
+    box.style.borderRadius = '8px';
+    box.style.padding = '10px 12px';
+    box.style.fontSize = '12.5px';
+    box.style.lineHeight = '1.7';
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function deployHelp(extra) {
+    if (!help) return;
+    help.innerHTML =
+      '<b>为什么会出现 404？</b> 后台页面位于企业网站项目 <code>app/admin/teacher-sub/page.tsx</code>，' +
+      '必须把网站代码重新构建并部署后该地址才存在；教师工作台静态页与后台页需要一起上线。<br>' +
+      '<b>部署步骤：</b>在 <code>D:/XM-XHY/企业网站制作</code> 执行 <code>npm run build</code>，' +
+      '并将 <code>app/admin/teacher-sub/</code>、<code>app/api/admin/teacher-sub/</code>、' +
+      '<code>app/api/ent/</code>、<code>app/teacher/</code>、<code>lib/teacher-sub.ts</code>、' +
+      '<code>public/teacher/</code> 一并提交推送，触发线上部署（Vercel / CloudBase）。<br>' +
+      (extra || '') +
+      '后台使用企业网站现有管理员会话鉴权，服务端以共享密钥调用腾讯云云函数；' +
+      '密钥与云函数网关地址均不下发浏览器。所有手动开通 / 停用操作都会写入审计日志。';
+  }
+
+  function notDeployed(reason) {
+    blocked = true;
+    msg(reason, 'warn');
+    deployHelp('<b>当前可用入口：</b> ' +
+      '<a href="' + esc(localUrl) + '">打开本地开发后台（需先启动网站 npm run dev）</a>　·　' +
+      '<a href="' + esc(onlineUrl) + '">仍要打开线上后台（未部署会显示 404）</a><br>');
+  }
+
+  // 本地预览：跨域无法可靠探测线上状态码，直接说明，不擅自跳转
+  if (!isSite) {
+    if (isLocal) {
+      notDeployed('当前为本地预览：线上企业网站尚未部署新版后台，直接跳转会显示 404。已阻止自动跳转，请先部署网站，或用下方「本地开发后台」验证。');
+    } else {
+      msg('将打开企业网站后台；若出现 404，说明网站尚未部署新版后台页面，请先完成网站部署。', 'warn');
+      deployHelp('');
+    }
+  } else {
+    // 同域：HEAD 探测，404 表示网站还是旧版本
+    var done = false;
+    var timer = setTimeout(function () {
+      if (done) return; done = true;
+      notDeployed('后台入口检测超时，已阻止跳转；请确认企业网站已部署且可访问。');
+    }, 4000);
+    fetch(SITE_PATH, { method: 'HEAD', credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) {
+        if (done) return; done = true; clearTimeout(timer);
+        if (r.status === 404) {
+          notDeployed('检测到企业网站尚未部署新版后台（/admin/teacher-sub 返回 404），已阻止跳转到错误页。');
+        } else {
+          msg('企业网站后台入口可用（HTTP ' + r.status + '），点击上方按钮进入。', 'ok');
+        }
+      })
+      .catch(function () {
+        if (done) return; done = true; clearTimeout(timer);
+        notDeployed('无法连接企业网站后台，已阻止跳转；请检查网络与网站部署状态。');
+      });
+  }
+
+  if (btn) btn.addEventListener('click', function (e) {
+    if (!blocked) return;
+    e.preventDefault();
+    msg('已阻止跳转到 404 页面。请先部署企业网站后台，或使用下方「本地开发后台」入口。', 'warn');
+    deployHelp('<b>当前可用入口：</b> ' +
+      '<a href="' + esc(localUrl) + '">打开本地开发后台（需先启动网站 npm run dev）</a>　·　' +
+      '<a href="' + esc(onlineUrl) + '">仍要打开线上后台（未部署会显示 404）</a><br>');
+  });
+})();
+</script>
+</body>
+</html>

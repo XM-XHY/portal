@@ -100,6 +100,22 @@ CloudBase 提供两种承载 Next.js 的方式，**推荐云托管（CloudRun）
 | `SUPABASE_URL` | 第二步拿到的 API 地址 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 服务端密钥（**不要用 anon key**，会被 RLS 拦截） |
 | `ADMIN_SESSION_SECRET` | 后台会话密钥，建议生成新的随机长字符串 |
+| `INITIAL_ADMIN_PASSWORD` | **新部署必填**：首次播种的初始管理员口令（源码不再含明文口令）。已有账号的线上库不受影响，但历史口令请在「后台 → 账号安全」手动轮换 |
+| `PAY_GRANT_SECRET` | 建议配置：付费下载授权票据签名密钥，缺省回落到 `ADMIN_SESSION_SECRET` |
+
+> 账号说明：`admins` 表为空时才会播种 `admin`(超管) / `market`(线索) 两个账号。
+> 未配置 `INITIAL_ADMIN_PASSWORD` 会随机生成口令并**只打印一次到启动日志**，需从日志捞取。
+
+### 公众号（选配）
+
+| 变量 | 说明 |
+|---|---|
+| `WECHAT_MP_TOKEN` / `WECHAT_MP_APPID` | 服务器配置 Token 与 AppID，二者齐全接口才启用 |
+| `WECHAT_MP_APPSECRET` | 设置自定义菜单时用 |
+| `WECHAT_MP_AESKEY` | 43 位 EncodingAESKey，**服务器配置选「安全模式」时必填**；明文/兼容模式可不填 |
+| `WECHAT_MP_DEFAULT_CODE` | 可选默认查询码，家长只发姓名也能查 |
+
+公众号消息接口现支持明文/兼容/安全三种模式，菜单 CLICK 事件（HELP / QUERY / UNBIND）与「解绑」文本指令均已实现。
 
 ### 国产大模型（选配，不配则 AI 客服走规则引擎+知识库兜底）
 
@@ -122,8 +138,17 @@ CloudBase 提供两种承载 Next.js 的方式，**推荐云托管（CloudRun）
 
 ### 微信支付（如已配置则沿用）
 
-`PAY_PROVIDER=wechat`、`WECHAT_PAY_MCH_ID`、`WECHAT_PAY_APP_ID`、
-`WECHAT_PAY_API_V3_KEY`、`WECHAT_PAY_SERIAL`、`WECHAT_PAY_PRIVATE_KEY`、`WECHAT_PAY_CERT`
+必填：`PAY_PROVIDER=wechat`、`WECHAT_PAY_MCH_ID`、`WECHAT_PAY_APP_ID`、
+`WECHAT_PAY_API_V3_KEY`、`WECHAT_PAY_SERIAL`、`WECHAT_PAY_PRIVATE_KEY`
+
+验签凭据**二选一**（推荐前者）：
+
+| 方案 | 变量 | 获取方式 | 说明 |
+|---|---|---|---|
+| **微信支付公钥（推荐）** | `WECHAT_PAY_PUBKEY_ID` + `WECHAT_PAY_PUBKEY` | 商户平台 → API 安全 → 微信支付公钥，页面直接查看复制 | 免证书下载工具，无证书轮换问题 |
+| 平台证书（传统） | `WECHAT_PAY_CERT` | 需用微信官方「证书下载工具」拉取 `wechatpay_*.pem` | 平台证书会轮换，需定期更新 |
+
+两者同时配置时，代码自动**优先采用公钥模式**。后台「支付通道状态」会显示当前生效的验签模式。
 
 **`PAY_NOTIFY_BASE` 改为 `https://www.cnxhy.top`**，并在微信商户平台配置回调地址：
 `https://www.cnxhy.top/api/pay/callback/wechat`
