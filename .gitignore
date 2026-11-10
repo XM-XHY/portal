@@ -60,3 +60,6 @@ sast.txt
 # 待写入部署平台的密钥暂存文件（含真实随机密钥，绝不入库）
 .secrets.pending.json
 *.secrets.pending.json
+
+# 本地 vitest 临时目录（TMPDIR 重定向用，避免沙箱临时目录 EPERM）
+.tmp-vitest/
